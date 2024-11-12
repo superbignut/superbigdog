@@ -100,7 +100,7 @@ def _bo_fang(index):
 
 """
     | 0     1     2    3  |   4    5  |  6    7  |  9      10  |   11    12     13 |     14    15   |   8    |
-    | 摸    摸    踢   踢  |  红    蓝 |  酒   酒 |  表扬   批评 |   上    下     挥  |    电低  电低  |   踢打 | 
+    | 摸    红    踢  表扬 |  红    蓝 |  酒   酒 |  表扬   批评 |   上    下     挥  |    电低  电低  |   红    |     
 """
 
 class YscNet(spaic.Network):
@@ -295,12 +295,12 @@ class Gouzi:
         
         """
             | 0     1     2    3  |   4    5  |  6    7  |  9      10  |   11    12     13 |     14    15   |   8    |
-            | 摸    摸    踢   踢  |  红    蓝 |  酒   酒 |  表扬   批评 |   上    下     挥  |    电低  电低  |   踢打 | 
+            | 摸    红    踢  表扬 |  红    蓝 |  酒   酒 |  表扬   批评 |   上    下     挥  |    电低  电低  |   红    |     
         """
 
     def start(self):
 
-        self.robot_net.load_weight_and_buffer(model_path="save_600/real_ysc_model", buffer_path='real_ysc_buffer_600.pth') # 这里以后还可以换成 其他训练轮数的模型
+        self.robot_net.load_weight_and_buffer(model_path="save_600/real_ysc_model_mic", buffer_path='real_ysc_buffer_600_mic.pth') # 这里以后还可以换成 其他训练轮数的模型
 
         self.emo_thread.start() # 情感线程启动
 
@@ -339,11 +339,10 @@ class Gouzi:
                     self.is_moving = True
                     #########################################
 
-
                     self.controller.zuo_you_huang()
-                    time.sleep(4)
+                    time.sleep(1)
                     self.controller.thread_active = False
-
+                    
                     #########################################
                     # 执行完所有动作后
                     self.emo_queue.popleft()
@@ -359,11 +358,11 @@ class Gouzi:
                     self.is_moving = True
                     #########################################
 
-                    # self.controller.hou_tui_2s()
-                    self.controller.di_tou()
-                    self.say_something(index=2)
-                    time.sleep(2)
+                    
+                    self.controller.low_height_of_dog()
+                    time.sleep(1)
                     self.controller.thread_active = False
+                    time.sleep(1)
 
                     #########################################
                     # 执行完所有动作后
@@ -383,25 +382,25 @@ class Gouzi:
             self.dmx = 0
             self.gesture = 0
             self.power = 0
+                
+            """
+            | 0     1     2    3  |   4    5  |  6    7  |  9      10  |   11    12     13 |     14    15   |   8    |
+            | 摸    红    踢  表扬 |  红    蓝 |  酒   酒 |  表扬   批评 |   上    下     挥  |    电低  电低  |   红    |     
+            """
 
     def emo_handle_thread(self):
         """
             根据self 的全局环境变量，前向传播得到情感输出
+            这个线程负责 把 输入转换为模型的输入， 然后 给出情感输出， 放到 self.deque 之中
         """
         while True:
-            # 这个线程负责 把 输入转换为模型的输入， 然后 给出情感输出， 放到 self.deque 之中
+            
             temp_input = [0 for _ in range(input_node_num_origin)]
-
-            ######################## 这里需要通过对
+            
             def _check_input():
                 if self.color == 2:
                     temp_input[4] = 1 # 红
                     temp_input[1] = 1
-                
-                """
-                | 0     1     2    3  |   4    5  |  6    7  |  9      10  |   11    12     13 |     14    15   |   8    |
-                | 摸    红    踢  表扬 |  红    蓝 |  酒   酒 |  表扬   批评 |   上    下     挥  |    电低  电低  |   红    |     
-                """
 
                 if self.alcohol == 1:
                     temp_input[6] = 1
@@ -409,7 +408,7 @@ class Gouzi:
                 
                 if self.dmx == 1:
                     temp_input[9] = 1
-                    temp_input[3] = 1
+                    temp_input[3] = 1                    
                 elif self.dmx ==2:
                     temp_input[10] = 1
 
@@ -421,30 +420,36 @@ class Gouzi:
                 
                 if self.power == 1:
                     temp_input[14] = 1 
-                    temp_input[15] = 1
+                    temp_input[15] = 1            
             
             
-            if self.is_moving: # 如果正在运动，也是不进行前向传播
-                self.clear()
-                continue 
-            else:                
-                # 这里打算等待imu 等待 1 秒钟， 如果有imu 交互输入 就 在线学习， 否则就 正常推理
-                start_time = time.time()
+            temp_f = False
+            # 这里打算等待imu 等待 1 秒钟， 如果有imu 交互输入 就 在线学习， 否则就 正常推理
+            start_time = time.time()
 
-                while time.time() - start_time < 1: # 在检查imu 的间隙 检查 其他输入
-                    _check_input() 
-                    if self.imu == 1:
-                        temp_input[0] = 1 # 摸
-                        break
-                    elif self.imu == 2:
-                        temp_input[2] = 1 # 踢
-                        break
-                    
-                    time.sleep(0.1)  # 每 0.1 秒检测一次
-                if sum(temp_input) < 1:
-                    continue 
-                print("input is : ", temp_input) # 有输入的情况
-                self.clear() # 清除状态
+            while time.time() - start_time < 1: # 在检查imu 的间隙 检查 其他输入
+                if self.is_moving: # 如果正在运动，也是不进行前向传播
+                    self.clear()
+                    temp_f = True
+                    break
+                
+                _check_input() # 继续检测输入
+
+                if self.imu == 1:
+                    temp_input[0] = 1 # 摸
+                    break
+                elif self.imu == 2:
+                    temp_input[2] = 1 # 踢
+                    break
+                
+                time.sleep(0.1)  # 每 0.1 秒检测一次
+
+            if sum(temp_input) < 1 or temp_f == True:
+                continue 
+
+            print("input is : ", temp_input) # 有输入的情况
+
+            self.clear() # 清除状态
             
             temp_input = torch.tensor(temp_input * input_num_mul_index, device=device).unsqueeze(0) # 增加了一个维度  
 
@@ -452,29 +457,37 @@ class Gouzi:
 
             temp_predict = self.robot_net.just_predict_with_no_assign_label_update(output=temp_output) # 得到预测
 
-            if temp_input[0] == 1:
-                # 如果抚摸输入是 1 ， 可以修改buffer
-                self.robot_net.influence_all_buffer(interact=0)
+            real_label = None
+            if temp_input[0][0] == 1:
+                # 抚摸输入
+                self.robot_net.influence_all_buffer(interact=INTERACT["POSITIVE"], temp_output=temp_output)
+            elif temp_input[0][2] == 1:
+                # 踢打输入
+                self.robot_net.influence_all_buffer(interact=INTERACT["NEGATIVE"], temp_output=temp_output)
             else:
-                # 只是单纯的正向强化
-                pass
+                # 正常情况， 只有前向传播
+                real_label = self.robot_net.new_check_label_from_data(temp_input)
+                self.robot_net.buffer[real_label].append(temp_output)
+                self.robot_net.assign_label_update()
 
-            self.emo_queue_add_in_lock(temp_predict) # 这里提前加入
+            self.emo_queue_add_in_lock(temp_predict) # 这里暂时还是 每次产生一个情感吧
                 
-            print("predict_label is: ", temp_predict, "real_label is: ")
+            print("predict_label is: ", temp_predict, "real_label is: ", real_label)
             
 
     def emo_queue_add_in_lock(self, data):
         with self.emo_queue_lock:
             self.emo_queue.append(data)
 
-    def handle_client_thread(self, client_socket):
+    def client_handle_thread(self, client_socket):
         # 处理不同客户端上报的环境数据， 修改self 的全局变量
         try:
             while True:
                 data = client_socket.recv(1024)
                 if not data:
                     break
+                if self.is_moving:
+                    continue
                 # print(data)
                 command, args1, args2 = data.decode('utf-8').split()  # 假设数据格式为 "COMMAND arg1 arg2"
                 # print(command, args1, args2)
@@ -573,7 +586,7 @@ class Gouzi:
         while True:
             client_socket, addr = server_socket.accept()
             print(f"Connection from {addr}")
-            client_handler = threading.Thread(target=self.handle_client_thread, args=(client_socket,))
+            client_handler = threading.Thread(target=self.client_handle_thread, args=(client_socket,))
             client_handler.start()
 
 

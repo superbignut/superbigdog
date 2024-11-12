@@ -6,8 +6,6 @@
 """
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
-import numpy as np
 import time
 
 
@@ -48,7 +46,7 @@ def check_red_func(cloth_img):
         data = "color " + str(0) + " " + str(0) # 其余
     
     client_socket.sendall(data.encode('utf-8'))
-    print "红色占比, " , red_ratio 
+    print "红色占比, " , red_ratio  
     time.sleep(0.4)
 
 
@@ -64,7 +62,7 @@ def video_demo():
             # out.write(frame)  # 写入帧到视频文件
             frame = cv2.flip(frame, 1)  # 摄像头是和人对立的，将图像左右调换回来正常显示。
             # print(frame.shape)
-            cv2.imshow("video", frame)
+            # cv2.imshow("video", frame)
             check_red_func(frame)
             c = cv2.waitKey(50)
             if c == 27: # ESC
