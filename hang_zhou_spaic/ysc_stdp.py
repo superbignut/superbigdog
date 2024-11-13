@@ -24,10 +24,10 @@ import pyaudio
 
 """
     | 0     1     2    3  |   4    5  |  6    7  |  9      10  |   11    12     13 |     14    15   |   8    |
-    | 摸    红    踢  表扬 |  红    蓝 |  酒   酒 |  表扬   批评 |   上    下     挥  |    电低  电低  |   红    |     
+    | 白    红    蓝  表扬 |  红    蓝 |  酒   酒 |  表扬   批评 |   上    下     挥  |    电低  电低  |   白    |     
 """
 
-EMO = {"POSITIVE":0, "NEGATIVE":1, "ANGRY":2} # NULL, 积极，消极，愤怒
+EMO = {"POSITIVE":0, "NEGATIVE":1, "ANGRY":2, "NULL_P":3, "NULL_N":4} # NULL(只在没有输入的时候使用 ), 积极，消极，愤怒
 
 INTERACT = {"POSITIVE":0, "NEGATIVE":1} # 用于对交互结果进行 积极和消极的判定
 
@@ -100,9 +100,8 @@ def _bo_fang(index):
 
 """
     | 0     1     2    3  |   4    5  |  6    7  |  9      10  |   11    12     13 |     14    15   |   8    |
-    | 摸    红    踢  表扬 |  红    蓝 |  酒   酒 |  表扬   批评 |   上    下     挥  |    电低  电低  |   红    |     
+    | 白    红    蓝  表扬 |  红    蓝 |  酒   酒 |  表扬   批评 |   上    下     挥  |    电低  电低  |   白    |     
 """
-
 class YscNet(spaic.Network):
     def __init__(self):
         super().__init__()
@@ -148,13 +147,13 @@ class YscNet(spaic.Network):
         """
             这里暗含了优先级的概念在里面, 但要是能真正影响 情绪输出的还得是 权重
         """
-        if data[0][2] == 1 or data[0][10] == 1 or data[0][12] == 1:
+        if data[0][2] == 1 or data[0][5] == 1 or data[0][10] == 1 or data[0][12] == 1:
             return EMO["ANGRY"] # 
         
-        elif data[0][15] == 1 or  data[0][14] == 1 or data[0][8] == 1 or data[0][7] == 1 or data[0][6] == 1 or data[0][4] == 1 or data[0][1] == 1:
+        elif data[0][15] == 1 or  data[0][14] == 1 or data[0][7] == 1 or data[0][6] == 1 or data[0][4] == 1 or data[0][1] == 1:
             return EMO['NEGATIVE']
         
-        elif data[0][0] == 1 or data[0][3] == 1 or data[0][5] == 1 or data[0][9] == 1 or data[0][11] == 1 or data[0][13] == 1:
+        elif data[0][0] == 1 or data[0][3] == 1 or data[0][8] == 1 or data[0][9] == 1 or data[0][11] == 1 or data[0][13] == 1:
             return EMO['POSITIVE']
         
         else:
@@ -295,7 +294,7 @@ class Gouzi:
         
         """
             | 0     1     2    3  |   4    5  |  6    7  |  9      10  |   11    12     13 |     14    15   |   8    |
-            | 摸    红    踢  表扬 |  红    蓝 |  酒   酒 |  表扬   批评 |   上    下     挥  |    电低  电低  |   红    |     
+            | 白    红    蓝  表扬 |  红    蓝 |  酒   酒 |  表扬   批评 |   上    下     挥  |    电低  电低  |   白    |     
         """
 
     def start(self):
@@ -320,8 +319,38 @@ class Gouzi:
             # _bo_fang(index=index)
             print("播放结束")
     
+    def positive_action_with_flag_changed(self): # 做一些积极的动作， 并标志flag
+        #########################################
+        self.is_moving = True
+        #########################################
 
+        self.controller.zuo_you_huang()
+        time.sleep(1)
+        self.controller.thread_active = False
+        
+        #########################################
+        # 执行完所有动作后
+        self.emo_queue.popleft()
+        self.is_moving = False
+        #
+        ########################################
+    def negative_action_with_flag_changed(self): # 做一些消极的动作， 并标志flag
+        #########################################
+        self.is_moving = True
+        #########################################
 
+        
+        self.controller.low_height_of_dog()
+        time.sleep(1)
+        self.controller.thread_active = False
+        time.sleep(1)
+
+        #########################################
+        # 执行完所有动作后
+        self.emo_queue.popleft()
+        self.is_moving = False
+        #
+        ########################################
 
     def action_handle_thread(self):
         """
@@ -333,43 +362,25 @@ class Gouzi:
                     
                     self.temp_emotion = EMO['POSITIVE']
 
-                    # if self.temp_emotion != self.last_emotion:
-
                     #########################################
-                    self.is_moving = True
+                    self.positive_action_with_flag_changed()
                     #########################################
-
-                    self.controller.zuo_you_huang()
-                    time.sleep(1)
-                    self.controller.thread_active = False
-                    
-                    #########################################
-                    # 执行完所有动作后
-                    self.emo_queue.popleft()
-                    self.is_moving = False
-                    #
-                    ########################################
 
                 elif self.emo_queue.count(EMO["NEGATIVE"])  == self.emo_len or self.emo_queue.count(EMO["ANGRY"])  == self.emo_len:
                     self.temp_emotion = EMO['NEGATIVE']
                     # if self.temp_emotion != self.last_emotion:  # 这个的加入 可以保证 两次的情感不是同一个
                         
                     #########################################
-                    self.is_moving = True
+                    self.negative_action_with_flag_changed()
                     #########################################
-
+                elif self.emo_queue.count(EMO['NULL_P'])  == self.emo_len: # 没有情感输入 只是 积极 动作 表达
                     
-                    self.controller.low_height_of_dog()
-                    time.sleep(1)
-                    self.controller.thread_active = False
-                    time.sleep(1)
+                    self.positive_action_with_flag_changed() # 这里其实可以换一下
 
-                    #########################################
-                    # 执行完所有动作后
-                    self.emo_queue.popleft()
-                    self.is_moving = False
-                    #
-                    ########################################
+                elif self.emo_queue.count(EMO['NULL_N'])  == self.emo_len: # 没有情感输入 只是 消极 动作 表达
+                    
+                    self.positive_action_with_flag_changed() # 这里其实可以换一下
+                    
             time.sleep(0.5)
                     
 
@@ -384,8 +395,8 @@ class Gouzi:
             self.power = 0
                 
             """
-            | 0     1     2    3  |   4    5  |  6    7  |  9      10  |   11    12     13 |     14    15   |   8    |
-            | 摸    红    踢  表扬 |  红    蓝 |  酒   酒 |  表扬   批评 |   上    下     挥  |    电低  电低  |   红    |     
+                | 0     1     2    3  |   4    5  |  6    7  |  9      10  |   11    12     13 |     14    15   |   8    |
+                | 白    红    蓝  表扬 |  红    蓝 |  酒   酒 |  表扬   批评 |   上    下     挥  |    电低  电低  |   白    |     
             """
 
     def emo_handle_thread(self):
@@ -396,6 +407,7 @@ class Gouzi:
         while True:
             
             temp_input = [0 for _ in range(input_node_num_origin)]
+            is_activate = None
             
             def _check_input():
                 if self.color == 2:
@@ -423,29 +435,36 @@ class Gouzi:
                     temp_input[15] = 1            
             
             
-            temp_f = False
+            is_moving_flag = False
             # 这里打算等待imu 等待 1 秒钟， 如果有imu 交互输入 就 在线学习， 否则就 正常推理
             start_time = time.time()
 
             while time.time() - start_time < 1: # 在检查imu 的间隙 检查 其他输入
                 if self.is_moving: # 如果正在运动，也是不进行前向传播
                     self.clear()
-                    temp_f = True
+                    is_moving_flag = True
                     break
                 
                 _check_input() # 继续检测输入
 
-                if self.imu == 1:
-                    temp_input[0] = 1 # 摸
+                if self.imu == 1: # 摸
+                    is_activate = INTERACT["POSITIVE"]
                     break
                 elif self.imu == 2:
-                    temp_input[2] = 1 # 踢
+                    is_activate = INTERACT['NEGATIVE']
                     break
                 
                 time.sleep(0.1)  # 每 0.1 秒检测一次
 
-            if sum(temp_input) < 1 or temp_f == True:
+            if is_moving_flag == True:
                 continue 
+            elif sum(temp_input) < 1:  # 
+                if is_activate is INTERACT['POSITIVE']: # 如果没有输入 只有交互 那就 制作简答的动作
+                    self.emo_queue_add_in_lock(data=EMO["NULL_P"]) # 表示只有只需要简答的动作
+                    continue
+                elif is_activate is INTERACT['NEGATIVE']:
+                    self.emo_queue_add_in_lock(data=EMO["NULL_N"]) # 表示只有简单的动作
+                    continue
 
             print("input is : ", temp_input) # 有输入的情况
 
@@ -458,17 +477,17 @@ class Gouzi:
             temp_predict = self.robot_net.just_predict_with_no_assign_label_update(output=temp_output) # 得到预测
 
             real_label = None
-            if temp_input[0][0] == 1:
+
+            if is_activate == INTERACT['POSITIVE']:
                 # 抚摸输入
                 self.robot_net.influence_all_buffer(interact=INTERACT["POSITIVE"], temp_output=temp_output)
-            elif temp_input[0][2] == 1:
+                self.robot_net.influence_all_buffer(interact=INTERACT["POSITIVE"], temp_output=temp_output)
+            elif is_activate == INTERACT["NEGATIVE"]:
                 # 踢打输入
                 self.robot_net.influence_all_buffer(interact=INTERACT["NEGATIVE"], temp_output=temp_output)
             else:
-                # 正常情况， 只有前向传播
-                real_label = self.robot_net.new_check_label_from_data(temp_input)
-                self.robot_net.buffer[real_label].append(temp_output)
-                self.robot_net.assign_label_update()
+                real_label = self.robot_net.new_check_label_from_data(data=temp_input)
+                
 
             self.emo_queue_add_in_lock(temp_predict) # 这里暂时还是 每次产生一个情感吧
                 
