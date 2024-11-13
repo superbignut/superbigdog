@@ -460,10 +460,16 @@ class Gouzi:
                 continue 
             elif sum(temp_input) < 1:  # 
                 if is_activate is INTERACT['POSITIVE']: # 如果没有输入 只有交互 那就 制作简答的动作
+                    print("简单 输出")
                     self.emo_queue_add_in_lock(data=EMO["NULL_P"]) # 表示只有只需要简答的动作
+                    self.clear()
                     continue
                 elif is_activate is INTERACT['NEGATIVE']:
                     self.emo_queue_add_in_lock(data=EMO["NULL_N"]) # 表示只有简单的动作
+                    self.clear()
+                    print("简单 输出")
+                    continue
+                else:
                     continue
 
             print("input is : ", temp_input) # 有输入的情况
@@ -481,12 +487,15 @@ class Gouzi:
             if is_activate == INTERACT['POSITIVE']:
                 # 抚摸输入
                 self.robot_net.influence_all_buffer(interact=INTERACT["POSITIVE"], temp_output=temp_output)
-                self.robot_net.influence_all_buffer(interact=INTERACT["POSITIVE"], temp_output=temp_output)
+                print("向积极方向修正")
             elif is_activate == INTERACT["NEGATIVE"]:
                 # 踢打输入
                 self.robot_net.influence_all_buffer(interact=INTERACT["NEGATIVE"], temp_output=temp_output)
+                print("向消极方向修正")
             else:
                 real_label = self.robot_net.new_check_label_from_data(data=temp_input)
+                self.robot_net.buffer[temp_predict].append(temp_output) # 根据 预测的结果正向强化
+                print("根据预测结果正向强化")
                 
 
             self.emo_queue_add_in_lock(temp_predict) # 这里暂时还是 每次产生一个情感吧
