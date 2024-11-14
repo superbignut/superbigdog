@@ -13,8 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import deque
-
-
+from enum import Enum
 
 log_path = './log/easyspaic'
 writer = SummaryWriter(log_path)
@@ -55,8 +54,6 @@ class EasyNet(spaic.Network):
         
         self.learner.set_optimizer('Adam', 0.001)
 
-
-
         self.set_backend(backend)
 
 
@@ -72,9 +69,6 @@ def train():
         _num = i % 2    
         data = temp_input = torch.tensor(_input[_num], device=device).unsqueeze(0) # 增加了一个维度  
 
-
-        if i == 150:
-            pass
         Net.input(data)
         Net.run(run_time)
         output = Net.output.predict
@@ -123,7 +117,41 @@ def single_test():
         predict_labels = torch.argmax(output, 1)
         print(predict_labels)
 
+def quant():
+    class Symmetric_Quantize:
+        class Target_Precision(Enum):
+            INT8=127
+    
+        def __init__(self, precision):
+            self.upper_bound = precision.value
+            self.lower_bound = - precision.value
+            self._scalar_factor = None
+            self._bias = None
+            self.q = 0.97
+        
+        def _get_scale_factor_score_weight(self, q, weight):
+            topq = torch.abs(weight).flatten(1).quantile(dim=1, q=q) # Todo
+            pass
+        
+        
+        def search_reasonable_quant_weight(self, weight):
+            # 这里就不选了， 直接用0.97
+            _score, _new_weight = Symmetric_Quantize._get_scale_factor(q=self.q, weight=weight)
+            
+
+        def __call__(self, origin_weight):
+            print(origin_weight)
+            _scalar_factor, _new_weight = Symmetric_Quantize.search_reasonable_quant_weight(weight=origin_weight)
+
+    quant_obj = Symmetric_Quantize(Symmetric_Quantize.Target_Precision.INT8)
+    quant_obj(Net.connection1.weight) # 把权重传进去
+    
+    
+    
 
 if __name__ == "__main__":
-    single_test()
     # train()
+    # single_test()
+    quant()
+    
+    
