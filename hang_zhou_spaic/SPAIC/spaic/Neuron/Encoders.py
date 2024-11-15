@@ -224,7 +224,9 @@ class PoissonEncoding(Encoder):
         elif self.single_test:
             return self.all_spikes[self.index]
         else:
-            return torch.rand(self.shape, device=self.device).le(self.source * self.unit_conversion * self.dt).type(self._backend.data_type)
+            temp = torch.rand(self.shape, device=self.device).le(self.source * self.unit_conversion * self.dt).type(self._backend.data_type)
+            # print("input is :", temp) # 这里确实 乘了一个 dt 感觉就把输入频率全部缩小了10倍，其实不是很理解
+            return temp
 
 
 Encoder.register('poisson', PoissonEncoding)

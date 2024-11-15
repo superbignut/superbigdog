@@ -1321,7 +1321,7 @@ class SELIFDebugModel(NeuronModel):
 class LIFModel(NeuronModel):
     """
     LIF model:
-    # V(t) = tuaM * V^n[t-1] + Isyn[t]   # tauM: constant membrane time (tauM=RmCm)
+    # V(t) = tuaM * V^n[t-1] + Isyn[t]   # tauM: constant membrane time (tauM=RmCm) # tag
     O^n[t] = spike_func(V^n[t-1])
     """
 
@@ -2010,7 +2010,7 @@ class LIFSTDPEXModel(NeuronModel):
     """
     LIF model:
     V(t) = decay_v * (v - v_rest) + v_rest + I^n[t]
-    I^n[t] = V0 * Isyn^n[t]  #V0 = 1
+    I^n[t] = V0 * Isyn^n[t]  #V0 = 1 synapase Isyn表示突触的输入总电流
     theta(t) = decay_th * theta[t-1]
     if v >= (vth + theta) then s_out = 1; else s_out = 0;
     Reset:
@@ -2044,17 +2044,25 @@ class LIFSTDPEXModel(NeuronModel):
         self._constant_variables['decay_v'] = kwargs.get('decay_v', np.exp(-1/100))
 
 
-        # self._operations.append(('I', 'var_mult', 'V0', 'I_synapse[updated]'))
-        self._operations.append(('PSP1', 'minus', 'V', 'Vrest'))
+        # self._operations.append(('I', 'var_mult', 'V0', 'I_synapse[updated]')) # 这里由于是1 所以省略了吗
+
+        # # V(t) = decay_v * (v - v_rest) + v_rest + I^n[t] 对应以下三步
+        self._operations.append(('PSP1', 'minus', 'V', 'Vrest')) 
         self._operations.append(('PSP2', 'var_linear', 'decay_v', 'PSP1', 'Vrest'))
-        self._operations.append(('Vtemp', 'add', 'PSP2', 'Isyn[updated]'))
+        self._operations.append(('Vtemp', 'add', 'PSP2', 'Isyn[updated]')) # Isyn是哪里得到的呢
+
+        # if v >= (vth + theta) then s_out = 1; else s_out = 0;
         self._operations.append(('theta_temp', 'var_mult', 'decay_th', 'theta[stay]'))
         self._operations.append(('Vth_theta', 'add', 'Vth', 'theta_temp'))
         self._operations.append(('O', 'threshold', 'Vtemp', 'Vth_theta'))
+
+        # V(t) = s_out * v_reset + (1 - s_out) * v; theta = theta + s_out * th_inc
         self._operations.append(('Resetting1', 'var_mult', 'Vreset', 'O[updated]'))
         self._operations.append(('Resetting2', 'var_mult', 'Vtemp', 'O[updated]'))
         self._operations.append(('Resetting3', 'minus', 'Vtemp', 'Resetting2'))
         self._operations.append(('V', 'add', 'Resetting1', 'Resetting3'))
+
+        # # theta(t) = decay_th * theta[t-1]
         self._operations.append(('Resetting_theta', 'var_mult', 'O[updated]', 'th_inc'))
         self._operations.append(('theta[stay]', 'add', 'theta_temp', 'Resetting_theta'))
 
