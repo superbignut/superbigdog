@@ -4,6 +4,7 @@
 
 """
 from hang_zhou_spaic.SPAIC import spaic
+# from hang_zhou_spaic.SPAIC.spaic
 import torch
 import math
 from hang_zhou_spaic.SPAIC.spaic.Learning.STCA_Learner import STCA
@@ -40,11 +41,11 @@ class EasyNet(spaic.Network):
 
         self.input = spaic.Encoder(num=input_dim, coding_method='poisson')
 
-        self.layer1 = spaic.NeuronGroup(num=layer_dim, model='lif')
+        self.layer1 = spaic.NeuronGroup(num=layer_dim, model='if')
 
         # self.layer2 = spaic.NeuronGroup(num=layer_dim, model='lif')
 
-        self.output = spaic.Decoder(num=layer_dim, dec_target=self.layer1, coding_method='spike_counts') 
+        self.output = spaic.Decoder(num=layer_dim, dec_target=self.layer1, coding_method='spike_counts')
 
         self.connection1 = spaic.Connection(self.input, self.layer1, link_type='full')
 
@@ -93,11 +94,13 @@ def train():
             acc.append(0)
         writer.add_scalar(tag="acc", scalar_value=sum(acc) / len(acc), global_step=i) # 每次打印准确率
         if i == 200:
-            Net.save_state(filename = 'save_200/easyspaic_200') # 这里需要手动删除保存的文件夹
+            # Net.save_state(filename = 'save_200/easyspaic_200') # 这里需要手动删除保存的文件夹
+            spaic.Network_saver.network_save(Net=Net, filename='save_200', save=True)
             break
     
 def single_test():
-    Net.state_from_dict(filename="save_200/easyspaic_200", device=device)
+    # Net.state_from_dict(filename="save_200/easyspaic_200", device=device)
+    Net = spaic.Network_loader.network_load(filename='save_200',device=device)
     for i in range(10):
         data =  torch.tensor([1,1,1,1,1, 0,0,0,0,0], device=device).unsqueeze(0)
         Net.input(data)
@@ -130,6 +133,10 @@ class LIFModel(NeuronModel):
     
     LIF model:
     # V(t) = tuaM * V^n[t-1] + Isyn[t]   # tauM: constant membrane time (tauM=RmCm)
+    # 上面写的应该是错的 ： 
+    # 正确的表达式为 dV/dt = - 1/tao V + I 
+    # 这个 tau 的合理 的值 应该也是 小于1 的, 但其实 如果不考虑 物理意义 tao 的值 或大或小 对训练又有什么影响呢
+
     O^n[t] = spike_func(V^n[t-1])
 
     def __init__(self, **kwargs):
@@ -191,19 +198,27 @@ def quant():
             # print(origin_weight)
            return self.search_reasonable_quant_weight(weight=origin_weight)
 
-    Net.state_from_dict(filename="save_200/easyspaic_200", device=device) # 加载权重
+    # Net.state_from_dict(filename="save_200/easyspaic_200", device=device) # 加载权重
+    Net = spaic.Network_loader.network_load(filename='save_200', device=device)
 
     quant_obj = Symmetric_Quantize(Symmetric_Quantize.Target_Precision.INT8) # 量化权重
 
     _scalar_factor, _new_weight= quant_obj(Net.connection1.weight.value) # 量化权重
 
+    vth_level = Symmetric_Quantize.Target_Precision.INT8.value
+
+    vth_origin = Net.layer1._var_dict['autoname1<net>_layer1<neg>:{Vth}'].value
+    # print(vth_origin)
+    _new_vth = torch.clamp(vth_origin * _scalar_factor, min=-vth_level, max=vth_level).detach().cpu().numpy()[0].item()
+
+    print("_new_vth is: ", _new_vth)
     class QuantEasyNet(spaic.Network): # 用于保存量化后模型的新网络
         def __init__(self):
             super().__init__()
 
             self.input = spaic.Encoder(num=input_dim, coding_method='poisson')
 
-            self.layer1 = spaic.NeuronGroup(num=layer_dim, model='lif', v_th=1.0*_scalar_factor, tau_m=8.0*_scalar_factor, v_reset=0.0) # 1 8 是原默认设置
+            self.layer1 = spaic.NeuronGroup(num=layer_dim, model='if', v_th=_new_vth, v_reset=0.0) #  这里还要再 clamp一下吧
 
             self.output = spaic.Decoder(num=layer_dim, dec_target=self.layer1, coding_method='spike_counts') 
 
@@ -224,10 +239,15 @@ def quant():
     # vth taum vreset 应该都要全比例的放大， reset=0 应该不用管吧
 
     Quant_Net = QuantEasyNet()
+    Quant_Net.build()
+    spaic.Network_saver.network_save(Net=Quant_Net, filename='save_200_quant', save=True)
 
+    """
+        实际测试发现，_variables.pt 的 tau_M 是不准确的，diff_para_dict里面的是正确的    
+    """
     # 测试SPAIC 量化后的模型效果: # 
-
-    for i in range(2):
+    # return
+    for i in range(1):
         data =  torch.tensor([1,1,1,1,1, 0,0,0,0,0], device=device).unsqueeze(0)
         Quant_Net.input(data)
         Quant_Net.run(run_time)
@@ -243,7 +263,8 @@ def quant():
 
         """plt.plot(time_line, value_line)
         plt.show() # """ #  观察一下电压情况
-        
+        # Quant_Net.save_state(filename = 'save_200_quant/easyspaic_200_quant')
+        # spaic.Network_saver.network_save(Net=Quant_Net, filename='save_200_quant', save=True)
 
         data =  torch.tensor([0,0,0,0,0, 1,1,1,1,1], device=device).unsqueeze(0)
         Quant_Net.input(data)
@@ -255,14 +276,41 @@ def quant():
         predict_labels = torch.argmax(output, 1)
         print(predict_labels)
 
-    # 竟然成功了
+    
+def compile_to_darwin():
 
-    
-    
+    from darwin3_deployment.codegen import dump_input_neuron, add_connections, dump_pop, dump_output_neuron
+    from darwin3_deployment.ir.net_population import PhysicalPopulation
+    from darwin3_deployment.core_config.get_model_config import get_model_config
+    from darwin3_deployment.pops_data import PopsDataConfig
+
+
+    input0_neurons = PhysicalPopulation(shape=[10, ], coord=[-1, 1], pop_position="input") # 使用负坐标， 表示不在darwin上
+    layer1_neurons = PhysicalPopulation(shape=[2,  ], coord=[ 0, 2]) #
+    output_neurons = PhysicalPopulation(shape=[2,  ], coord=[-1, 3], pop_position='output') # 使用负坐标 
+
+    emo_net_weight = torch.load(r"C:\Users\bignuts\Desktop\ZJU\hang_zhou\alcohol\save_200_quant\parameters\_variables.pt") # 加载权重
+
+    weight_input0_to_layer1 = emo_net_weight[r'autoname14<net>_connection1<con>:autoname14<net>_layer1<neg><-autoname14<net>_input<nod>:{weight}'].detach().cpu() # 
+    layer1_vth = emo_net_weight[r'autoname14<net>_layer1<neg>:{Vth}'].detach().cpu().item()
+    # print(layer1_vth)
+
+    add_connections('full',   weight=weight_input0_to_layer1, pre_pops=input0_neurons, post_pops=layer1_neurons) # 
+    add_connections('output', weight=None,                    pre_pops=layer1_neurons, post_pops=output_neurons) # 添加轴突是什么意思
+
+    pops_data = {}
+    pops_data['layer1'] = {}
+    pops_data['layer1']['core_config'] = get_model_config('if', vth=layer1_vth) # 这里暂时用if
+
+    pops_data_config = PopsDataConfig()
+    pops_data_config.set_pops_data(pops_data) # 注册
+
+    dump_pop(pop_list=layer1_neurons, pop_name='layer1',output_dir='./save_darwin') # Todo  这个要怎么设定
+    dump_input_neuron(input_pops=input0_neurons, output_dir='./save_darwin')
+    dump_output_neuron(output_pops=layer1_neurons, pop_name="output_pop", output_dir='./save_darwin')
 
 if __name__ == "__main__":
     # train()
-    single_test()
+    # single_test()
     # quant()
-    
-    
+    compile_to_darwin()

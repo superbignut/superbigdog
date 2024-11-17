@@ -690,7 +690,7 @@ class AdaptiveCLIFModel(NeuronModel):
         self._operations.append(('E', 'var_linear', 'tauM', 'E', 'Resetting'))
 
 NeuronModel.register("aclif", AdaptiveCLIFModel)
-class IFModel(NeuronModel):
+class IFModel(NeuronModel):#########################
     """
     IF model:
     V(t) = V(t-1) * (1 - O(t-1)) + Isyn[t] - ConstantDecay
@@ -1323,7 +1323,7 @@ class LIFModel(NeuronModel):
     LIF model:
     # V(t) = tuaM * V^n[t-1] + Isyn[t]   # tauM: constant membrane time (tauM=RmCm) # tag
     O^n[t] = spike_func(V^n[t-1])
-    """
+    """##################
 
     def __init__(self, **kwargs):
         super(LIFModel, self).__init__()
