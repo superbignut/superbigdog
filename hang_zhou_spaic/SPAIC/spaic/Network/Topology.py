@@ -910,7 +910,8 @@ class Connection(Projection):
             dt = backend.dt
             for (key, value) in self.synapse[i]._syn_tau_variables.items():
                 key = self.add_conn_label(key)
-                tau_value = np.exp(-dt / value)
+                tau_value = np.exp(-dt / value) # 果然 这里把 tau 常数给衰减了
+                # print(tau_value, dt, value)
                 # 暂时只考虑scalar值
                 self.variable_to_backend(key, shape=[1, ], value=tau_value)
 

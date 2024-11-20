@@ -4,3 +4,4 @@
 /**/__pycache__
 /save*
 /run_in_darwin
+*.code-workspace

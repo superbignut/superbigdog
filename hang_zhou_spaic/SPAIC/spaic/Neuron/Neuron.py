@@ -690,7 +690,7 @@ class AdaptiveCLIFModel(NeuronModel):
         self._operations.append(('E', 'var_linear', 'tauM', 'E', 'Resetting'))
 
 NeuronModel.register("aclif", AdaptiveCLIFModel)
-class IFModel(NeuronModel):#########################
+class IFModel(NeuronModel):############################
     """
     IF model:
     V(t) = V(t-1) * (1 - O(t-1)) + Isyn[t] - ConstantDecay
@@ -1337,6 +1337,7 @@ class LIFModel(NeuronModel):
         self._constant_variables['Vreset'] = kwargs.get('v_reset', 0.0)
 
         self._tau_variables['tauM'] = kwargs.get('tau_m', 8.0)
+        # print(self._tau_variables)
 
         self._operations.append(('Vtemp', 'var_linear', 'tauM', 'V', 'Isyn[updated]'))
         self._operations.append(('O', 'threshold', 'Vtemp', 'Vth'))
@@ -2031,7 +2032,7 @@ class LIFSTDPEXModel(NeuronModel):
         self._variables['V'] = -65.0
         self._variables['O'] = 0.0
         self._variables['Isyn'] = 0.0
-        self._variables['theta[stay]'] = 0.0
+        self._variables['theta[stay]'] = 0.0 # 好像每次只需要重新在寄存器中保存这个变量就ok了
         self._variables['Vth_theta'] = 0.0
 
         # self._constant_variables['V0'] = 1
@@ -2039,7 +2040,7 @@ class LIFSTDPEXModel(NeuronModel):
         self._constant_variables['Vth'] = kwargs.get('v_th', -52.0)
         self._constant_variables['Vreset'] = kwargs.get('v_reset', -60.0)
         self._constant_variables['Vrest'] = kwargs.get('v_rest', -65.0)
-        self._constant_variables['th_inc'] = kwargs.get('th_inc', 0.05)
+        self._constant_variables['th_inc'] = kwargs.get('th_inc', 0.05)   # theta_inc 每次增长 0.05
         self._constant_variables['decay_th'] = kwargs.get('decay_th', np.exp(-1/1e7))
         self._constant_variables['decay_v'] = kwargs.get('decay_v', np.exp(-1/100))
 
@@ -2052,19 +2053,19 @@ class LIFSTDPEXModel(NeuronModel):
         self._operations.append(('Vtemp', 'add', 'PSP2', 'Isyn[updated]')) # Isyn是哪里得到的呢
 
         # if v >= (vth + theta) then s_out = 1; else s_out = 0;
-        self._operations.append(('theta_temp', 'var_mult', 'decay_th', 'theta[stay]'))
-        self._operations.append(('Vth_theta', 'add', 'Vth', 'theta_temp'))
-        self._operations.append(('O', 'threshold', 'Vtemp', 'Vth_theta'))
+        self._operations.append(('theta_temp', 'var_mult', 'decay_th', 'theta[stay]')) # theta衰减 衰减
+        self._operations.append(('Vth_theta', 'add', 'Vth', 'theta_temp')) # theta 加 阈值
+        self._operations.append(('O', 'threshold', 'Vtemp', 'Vth_theta')) # 脉冲 判断
 
         # V(t) = s_out * v_reset + (1 - s_out) * v; theta = theta + s_out * th_inc
-        self._operations.append(('Resetting1', 'var_mult', 'Vreset', 'O[updated]'))
-        self._operations.append(('Resetting2', 'var_mult', 'Vtemp', 'O[updated]'))
-        self._operations.append(('Resetting3', 'minus', 'Vtemp', 'Resetting2'))
-        self._operations.append(('V', 'add', 'Resetting1', 'Resetting3'))
+        self._operations.append(('Resetting1', 'var_mult', 'Vreset', 'O[updated]')) # vreset * out 
+        self._operations.append(('Resetting2', 'var_mult', 'Vtemp', 'O[updated]')) 
+        self._operations.append(('Resetting3', 'minus', 'Vtemp', 'Resetting2')) # vtemp * ( 1 - out )
+        self._operations.append(('V', 'add', 'Resetting1', 'Resetting3')) # v =  .  add  .
 
         # # theta(t) = decay_th * theta[t-1]
-        self._operations.append(('Resetting_theta', 'var_mult', 'O[updated]', 'th_inc'))
-        self._operations.append(('theta[stay]', 'add', 'theta_temp', 'Resetting_theta'))
+        self._operations.append(('Resetting_theta', 'var_mult', 'O[updated]', 'th_inc')) # theta 是否增长 0.05 
+        self._operations.append(('theta[stay]', 'add', 'theta_temp', 'Resetting_theta')) # 增长的话 就加进去
 
 
 NeuronModel.register("lifstdp_ex", LIFSTDPEXModel)
@@ -2124,7 +2125,7 @@ class ALIFSTDPEXModel(NeuronModel):
 
 NeuronModel.register("alifstdp_ex", ALIFSTDPEXModel)
 
-class LIFSTDPIHModel(NeuronModel):
+class LIFSTDPIHModel(NeuronModel): ####
     """
     LIF model:
     V(t) = decay_v * (v - v_rest) + v_rest + I^n[t]
