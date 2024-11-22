@@ -2032,7 +2032,8 @@ class LIFSTDPEXModel(NeuronModel):
         self._variables['V'] = -65.0
         self._variables['O'] = 0.0
         self._variables['Isyn'] = 0.0
-        self._variables['theta[stay]'] = 0.0 # 好像每次只需要重新在寄存器中保存这个变量就ok了
+        self._variables['theta[stay]'] = 0.0 # 好像每次只需要重新在寄存器中保存这个变量就ok了， 在darwin上
+        # 这个stay 的意思就是每次 25个时间步之后，这个量会被存起来，下次脉冲了接着用， 其他的就是下次就是新的了
         self._variables['Vth_theta'] = 0.0
 
         # self._constant_variables['V0'] = 1
@@ -2041,8 +2042,9 @@ class LIFSTDPEXModel(NeuronModel):
         self._constant_variables['Vreset'] = kwargs.get('v_reset', -60.0)
         self._constant_variables['Vrest'] = kwargs.get('v_rest', -65.0)
         self._constant_variables['th_inc'] = kwargs.get('th_inc', 0.05)   # theta_inc 每次增长 0.05
-        self._constant_variables['decay_th'] = kwargs.get('decay_th', np.exp(-1/1e7))
-        self._constant_variables['decay_v'] = kwargs.get('decay_v', np.exp(-1/100))
+        self._constant_variables['decay_th'] = kwargs.get('decay_th', np.exp(-1/1e7)) # 0.9999999 这是在开玩笑吗， 所以就意味着 如果一个模式 成型了之后，这个模式的阈值基本就定死了，
+        # 一直维持在一个很高的水平，完全下不来了，
+        self._constant_variables['decay_v'] = kwargs.get('decay_v', np.exp(-1/100)) # 0.99 这个衰减其实降低了大多数（非大权重）神经元的脉冲机会，进而体现在手写体的图像上就是杂色变少了
 
 
         # self._operations.append(('I', 'var_mult', 'V0', 'I_synapse[updated]')) # 这里由于是1 所以省略了吗
@@ -2154,7 +2156,7 @@ class LIFSTDPIHModel(NeuronModel): ####
         self._constant_variables['Vth'] = kwargs.get('v_th', -40.0)
         self._constant_variables['Vreset'] = kwargs.get('v_reset', -45.0)
         self._constant_variables['Vrest'] = kwargs.get('v_rest', -60.0)
-        self._constant_variables['decay_v'] = kwargs.get('decay_v', np.exp(-1/10))
+        self._constant_variables['decay_v'] = kwargs.get('decay_v', np.exp(-1/10)) # 这个的衰减还是挺大方的吗
 
 
         # self._operations.append(('I', 'var_mult', 'V0', 'I_synapse[updated]'))

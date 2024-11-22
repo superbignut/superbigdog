@@ -5,3 +5,7 @@
 /save*
 /run_in_darwin
 *.code-workspace
+/API_4.0/apps/config_files/*
+/API_4.0/apps/debug_files/*
+/API_4.0/apps/deploy_files/*
+/API_4.0/apps/model/*
