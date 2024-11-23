@@ -2038,7 +2038,7 @@ class LIFSTDPEXModel(NeuronModel):
 
         # self._constant_variables['V0'] = 1
 
-        self._constant_variables['Vth'] = kwargs.get('v_th', -52.0)
+        self._constant_variables['Vth'] = kwargs.get('v_th', -52.0) # 
         self._constant_variables['Vreset'] = kwargs.get('v_reset', -60.0)
         self._constant_variables['Vrest'] = kwargs.get('v_rest', -65.0)
         self._constant_variables['th_inc'] = kwargs.get('th_inc', 0.05)   # theta_inc 每次增长 0.05
