@@ -71,8 +71,8 @@ def spaic_stdpexlif_ts_config(timestep=25, th_inc=25, th_sub=1, vreset=-100): # 
             ADD(rs=3, rt=0, ns=0), # r3 = vt
             ADD(rs=3, rt=0, ns=0), # r3 = 2vt
             ADD(rs=3, rt=0, ns=0), # r3 = 3vt
-            SFTI(rs=3, sf=SFTI.SF.RIGHT, ns=0, imme=8), # r3 >> 8: r3 = 3/256 vt = 0.012vt
-            SUB(rs=0, rt=3, ns=0), # vt' = vt - 0.01vt = 0.99vt
+            SFTI(rs=3, sf=SFTI.SF.RIGHT, ns=0, imme=8), # r3 >> 8: r3 = 3/256 vt = 0.012vt, 这里有问题，如果是负数的话 会越减越大，应该要加
+            ADD(rs=0, rt=3, ns=0), # vt' = vt - 0.01vt = 0.99vt 所以改成 ADD
             LSIS(ls=LSIS.LS.LOAD, nph=0b0000_0010), # 加载res 到寄存器，存储的是我的vth_theta  # 这里第一次 也不能加   vth theta
             ADD(rs=1, rt=5, ns=0), # vth += res # vth  = vth + vth_theta # 这里的vth 被更改了
             UPTVT(fcs=1, fcph=0), # 更新电压 vt += wgtsum

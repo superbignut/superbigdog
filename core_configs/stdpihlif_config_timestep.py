@@ -102,7 +102,7 @@ def spaic_stdpihlif_ts_config(timestep=25, vreset=-100):
             ADD(rs=3, rt=0, ns=0), # r3 = 2vt
             ADD(rs=3, rt=0, ns=0), # r3 = 3vt
             SFTI(rs=3, sf=SFTI.SF.RIGHT, ns=0, imme=5), # r3 >> 5: r3 = 3/32 vt = 0.093vt
-            SUB(rs=0, rt=3, ns=0), # vt' = vt - 0.01vt = 0.907vt
+            ADD(rs=0, rt=3, ns=0), # vt' = vt - 0.01vt = 0.907vt
             UPTVT(fcs=1, fcph=0), # 更新电压 vt += wgtsum
             CMP(rs=2, rt=6, func=CMP.Func.EQ),  # 如果rs=2 == 1 # 这里应该是 如果 rs=2 是 1 就不脉冲 gsp参数 是 0
             JC(cmpf=1, cmpr=1, addr=22), # CMP = True 不jmp 否则jmp
