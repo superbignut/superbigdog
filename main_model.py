@@ -223,7 +223,7 @@ def compile_to_darwin():
 
     pops_data['layer2'] = {} # layer2 就是lif 0.9 的衰减
     # vreset 的 区间是 -32768 ~ 32768 是 16位有符号寄存器
-    pops_data['layer2']['core_config'] = spaic_stdpihlif_ts_config(vreset=-45*400, timestep=time_step) 
+    pops_data['layer2']['core_config'] = spaic_stdpihlif_ts_config(vreset=-45*400, timestep=time_step) #     25    1  
     pops_data['layer2']['my_vth'] = ( np.zeros(label_num, ) - 40 * 400 ) # 初始化是-52 # 16位有符号
     pops_data['layer2']['my_loop_index'] = ( np.zeros(label_num, ) ) # 初始化是 0 
 
@@ -235,9 +235,27 @@ def compile_to_darwin():
     dump_input_neuron(input_pops=input0_neurons, output_dir='./save_stdp')
     dump_output_neuron(output_pops=layer1_neurons, pop_name="output_pop", output_dir='./save_stdp')
 
-def input_func():
+def input_func(input_ls, unit_conversion=0.8, dt=0.1):# 这连个参数对标spaic的possion_encoder
+    # import numpy as np
+    # rand_input = np.where(np.random.rand(*input_ls.shape) < input_ls * unit_conversion * dt)
+    a = (np.random.rand(*input_ls.shape) < input_ls * unit_conversion * dt)
+
+    return np.nonzero(a[0].astype(int))[0]
     # temp = torch.rand(self.shape, device=self.device).le(self.source * self.unit_conversion * self.dt).type(self._backend.data_type)
-    pass
+    
+ls = np.zeros(100,)
+""" def darwin_step():
+    global ls
+    for _ in range(25):
+        input_ls = np.array([[1 if i==2 or i == 5 else 0.01 for i in range(16)] * 16])
+        a = input_func(input_ls)
+        out = test.run_darwin3_withoutfile(spike_neurons=[a])
+
+        for i in range(len(out[0])):
+            index = out[0][i][1]
+            ls[index] += 1
+    print(ls.nonzero())
+    print(ls[ls.nonzero()]) """
 
 if __name__ == "__main__":
     # train()
