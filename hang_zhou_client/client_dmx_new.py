@@ -157,7 +157,6 @@ def run():
             text = baidu_wav_to_words() # wav 
             print(text) 
 
-
             text  = "从一个小狗的角度，判断下面这段话属于，1表扬我，2批评我，3正常谈话， 当中的哪个种类，只需要用编号1或2或3来回答我。" + text
             print(text)
             web_text = demo_api(input_txt=text) # 

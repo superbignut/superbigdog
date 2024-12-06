@@ -13,6 +13,7 @@ from collections import deque
 from enum import Enum
 import os
 
+
 def single_test():
     device = torch.device("cuda:0")
 
@@ -166,7 +167,6 @@ def quant():
 
     print("_new_vth is: ", _new_vth)
 
-
 def delete_dir_file(dir_path, root_dir_rm=False):
     """
     递归删除文件夹下文件和子文件夹里的文件，不会删除空文件夹
@@ -185,16 +185,19 @@ def delete_dir_file(dir_path, root_dir_rm=False):
     if root_dir_rm == True and os.path.exists(dir_path):
         os.rmdir(dir_path)
     
+    
 def compile_to_darwin():
 
     from darwin3_deployment.codegen import dump_input_neuron, add_connections, dump_pop, dump_output_neuron
     from darwin3_deployment.ir.net_population import PhysicalPopulation
     from darwin3_deployment.core_config.get_model_config import get_model_config
     from darwin3_deployment.pops_data import PopsDataConfig
+    from darwin3_deployment.codegen import add_standard_connection
     from core_configs.lif_config import spaic_lif_config
     from core_configs.stdpexlif_config_timestep import spaic_stdpexlif_ts_config
     from core_configs.stdpihlif_config_timestep import spaic_stdpihlif_ts_config
-
+    from core_configs.stdpexlif_config_timestep_learn import spaic_stdpexlif_ts_learn_config
+    from core_configs.stdpihlif_config_timestep_learn import spaic_stdpihlif_ts_learn_config
 
     time_step = 25
 
@@ -209,14 +212,23 @@ def compile_to_darwin():
 
     emo_net_weight = torch.load(r"C:\Users\bignuts\Desktop\ZJU\hang_zhou\alcohol\quant_input_layer1.pth").detach().cpu().numpy() # 加载权重
 
-    # weight_input0_to_layer1 = emo_net_weight[r'autoname1<net>_connection1<con>:autoname1<net>_layer1<neg><-autoname1<net>_input<nod>:{weight}'].detach().cpu() # 
-    # layer1_vth = emo_net_weight[r'autoname14<net>_layer1<neg>:{Vth}'].detach().cpu().item()
-    # print(layer1_vth)
-
-    add_connections('full',   
+    """     add_connections('full',   
                     weight=emo_net_weight, 
                     pre_pops=input0_neurons, 
-                    post_pops=layer1_neurons) # 
+                    post_pops=layer1_neurons) #  """
+    
+
+    # 使用 标准连接 代替 全连接 以 支持学习功能
+    post_neu_ids = list(range(label_num))       # 标准连接 后神经元个数
+    for pre_neu_id in range(input_node_num):    # 标准连接 前神经元 遍历
+        add_standard_connection(emo_net_weight[:, 
+                                pre_neu_id], 
+                                pre_pop=input0_neurons, 
+                                post_pop=layer1_neurons,
+                                pre_neu_id=pre_neu_id, 
+                                post_neu_ids=post_neu_ids)
+    
+
     add_connections('full',   
                     weight=np.diag(np.ones(label_num)) * 22, 
                     pre_pops=layer1_neurons, 
@@ -233,17 +245,22 @@ def compile_to_darwin():
     pops_data = {}
     pops_data['layer1'] = {} # layer1 是stdpex 
     # vreset 的 区间是 -32768 ~ 32768 是 16位有符号寄存器
-    pops_data['layer1']['core_config'] = spaic_stdpexlif_ts_config(vreset=-60*400, timestep=time_step, th_inc=25, th_sub=1) 
-    pops_data['layer1']['vth_theta'] = ( np.zeros((label_num, )) + 0 ) # 所有的vth_theta最开始都是0， 每次脉冲增加 25
+    pops_data['layer1']['core_config'] = spaic_stdpexlif_ts_learn_config(vreset=-60*400, timestep=time_step, th_inc=25, th_sub=1) 
+    """     pops_data['layer1']['vth_theta'] = ( np.zeros((label_num, )) + 0 ) # 所有的vth_theta最开始都是0， 每次脉冲增加 25
     pops_data['layer1']['my_vth'] = ( np.zeros(label_num, ) - 52 * 400 ) # 初始化是-52 # 16位有符号
-    pops_data['layer1']['my_loop_index'] = ( np.zeros(label_num, ) ) # 初始化是 0 
+    pops_data['layer1']['my_loop_index'] = ( np.zeros(label_num, ) ) # 初始化是 0  """
+    pops_data['layer1']['vth_theta'] = ( np.zeros((label_num, )) + 0 ) # 所有的vth_theta最开始都是0， 每次脉冲增加 25
+    pops_data['layer1']['my_vth'] = ( np.zeros(label_num, ) ) # 初始化是-52 # 16位有符号
+    pops_data['layer1']['my_loop_index'] = ( np.zeros(label_num, ) )
+    pops_data['layer1']['1ax'] = ( np.zeros(label_num, ) + 16 )
+    # pops_data['layer1']['0x'] = ( np.zeros(label_num, ) + 0)
 
 
     pops_data['layer2'] = {} # layer2 就是lif 0.9 的衰减
     # vreset 的 区间是 -32768 ~ 32768 是 16位有符号寄存器
-    pops_data['layer2']['core_config'] = spaic_stdpihlif_ts_config(vreset=-45*400, timestep=time_step) #     25    1  
-    pops_data['layer2']['my_vth'] = ( np.zeros(label_num, ) - 40 * 400 ) # 初始化是-52 # 16位有符号
-    pops_data['layer2']['my_loop_index'] = ( np.zeros(label_num, ) ) # 初始化是 0 
+    pops_data['layer2']['core_config'] = spaic_stdpihlif_ts_learn_config(vreset=-45*400, timestep=time_step) #     25    1  
+    # pops_data['layer2']['my_vth'] = ( np.zeros(label_num, ) - 40 * 400 ) # 初始化是-52 # 16位有符号
+    # pops_data['layer2']['my_loop_index'] = ( np.zeros(label_num, ) ) # 初始化是 0 
 
     pops_data_config = PopsDataConfig()
     pops_data_config.set_pops_data(pops_data) # 注册
@@ -283,6 +300,7 @@ if __name__ == "__main__":
     # train()
     # single_test()
     # quant()
+    
     compile_to_darwin()
 
 
