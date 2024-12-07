@@ -221,8 +221,7 @@ def compile_to_darwin():
     # 使用 标准连接 代替 全连接 以 支持学习功能
     post_neu_ids = list(range(label_num))       # 标准连接 后神经元个数
     for pre_neu_id in range(input_node_num):    # 标准连接 前神经元 遍历
-        add_standard_connection(emo_net_weight[:, 
-                                pre_neu_id], 
+        add_standard_connection(weight=emo_net_weight[:, pre_neu_id], 
                                 pre_pop=input0_neurons, 
                                 post_pop=layer1_neurons,
                                 pre_neu_id=pre_neu_id, 
@@ -246,21 +245,18 @@ def compile_to_darwin():
     pops_data['layer1'] = {} # layer1 是stdpex 
     # vreset 的 区间是 -32768 ~ 32768 是 16位有符号寄存器
     pops_data['layer1']['core_config'] = spaic_stdpexlif_ts_learn_config(vreset=-60*400, timestep=time_step, th_inc=25, th_sub=1) 
-    """     pops_data['layer1']['vth_theta'] = ( np.zeros((label_num, )) + 0 ) # 所有的vth_theta最开始都是0， 每次脉冲增加 25
-    pops_data['layer1']['my_vth'] = ( np.zeros(label_num, ) - 52 * 400 ) # 初始化是-52 # 16位有符号
-    pops_data['layer1']['my_loop_index'] = ( np.zeros(label_num, ) ) # 初始化是 0  """
     pops_data['layer1']['vth_theta'] = ( np.zeros((label_num, )) + 0 ) # 所有的vth_theta最开始都是0， 每次脉冲增加 25
-    pops_data['layer1']['my_vth'] = ( np.zeros(label_num, ) ) # 初始化是-52 # 16位有符号
-    pops_data['layer1']['my_loop_index'] = ( np.zeros(label_num, ) )
-    pops_data['layer1']['1ax'] = ( np.zeros(label_num, ) + 16 )
-    # pops_data['layer1']['0x'] = ( np.zeros(label_num, ) + 0)
+    pops_data['layer1']['my_vth'] = ( np.zeros(label_num, ) - 52 * 400 ) # 初始化是-52 # 16位有符号
+    pops_data['layer1']['my_loop_index'] = ( np.zeros(label_num, ) ) # 初始化是 0  
+
+    pops_data['layer1']['1ax'] = ( np.zeros(label_num, ) + 0 ) #   迹初始化是 0
 
 
     pops_data['layer2'] = {} # layer2 就是lif 0.9 的衰减
     # vreset 的 区间是 -32768 ~ 32768 是 16位有符号寄存器
     pops_data['layer2']['core_config'] = spaic_stdpihlif_ts_learn_config(vreset=-45*400, timestep=time_step) #     25    1  
-    # pops_data['layer2']['my_vth'] = ( np.zeros(label_num, ) - 40 * 400 ) # 初始化是-52 # 16位有符号
-    # pops_data['layer2']['my_loop_index'] = ( np.zeros(label_num, ) ) # 初始化是 0 
+    pops_data['layer2']['my_vth'] = ( np.zeros(label_num, ) - 40 * 400 ) # 初始化是-52 # 16位有符号
+    pops_data['layer2']['my_loop_index'] = ( np.zeros(label_num, ) ) # 初始化是 0 
 
     pops_data_config = PopsDataConfig()
     pops_data_config.set_pops_data(pops_data) # 注册

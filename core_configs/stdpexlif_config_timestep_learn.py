@@ -28,7 +28,7 @@ def spaic_stdpexlif_ts_learn_config(timestep=25, th_inc=25, th_sub=1, vreset=-10
         每timestep 次后 电压清空
     
     """
-    len_of_learning = 2
+    len_of_learning = 3
     len_of_forward = 10
     len_of_update = 3
 
@@ -50,63 +50,14 @@ def spaic_stdpexlif_ts_learn_config(timestep=25, th_inc=25, th_sub=1, vreset=-10
             # 更新权重阶段 这里每一个神经元都执行了256次
 
             LSIS(ls=LSIS.LS.LOAD, nph=0b0001_0000), # i
-            ADDI(rs=0x02, imme=1),
             LSIS(ls=LSIS.LS.STORE, nph=0b0001_0000), # i
             NPC(),
 
+
+
+
+
             # 推理阶段
-
-            # ADDI(rs=0x06, imme=0),
-            LSIS(ls=LSIS.LS.LOAD, nph=0b0000_0010), # res
-            ADDI(rs=0x05, imme=1),
-            LSIS(ls=LSIS.LS.STORE, nph=0b0000_0010), # res
-            NPC(),
-
-
-
-            LSIS(ls=LSIS.LS.LOAD, nph=0b0010_0000), # vth
-            ADDI(rs=0x01, imme=1),
-            LSIS(ls=LSIS.LS.STORE, nph=0b0010_0000), # vth
-            NPC(),
-
-
-
-            # 更新 迹 阶段
-
-        ]
-    )
-
-    """                  LSLS(ls=LSLS.LS.LOAD, pre=True, nph=0b0000_0001), # 1ax
-            ADDI(rs=0x08, imme=1),
-            LSLS(ls=LSLS.LS.STORE, pre=True, nph=0b0000_0001), # 1ax       """
-
-
-
-    """     if vth >= 0:
-        core_config.set_register("R1", int(vth)) # 这么写应该是 只配置了寄存器，但是没配 存储器
-    else:
-        core_config.set_register("R1", int(hex(-52 & 0xffff), 16)) """
-    
-    # vth 的话 用LSIS 直接加载 就不用手动去设置寄存器了
-
-    # 每次脉冲后衰减到 -100
-
-    # core_config.set_register("CR_VTDEC", int(hex((vreset & 0xffff)<<16), 16)) 
-    # core_config.set_register("CR_CGEN", 0x0f) # 改成 f + cli_LI = 0 推理的最后一个字节不会出错 但都执行1步后 会都卡住 , 其余 推理会出错
-    core_config.set_register("CR_LI", 0x00) # 改成 0 学习阶段 会变得很混乱
-    core_config.set_learning_mode(True) # 
-
-    # core_config.set_register("CR_LPARXY", )
-    # core_config.initial_inference_state_memory()
-
-
-
-    # 这么写真抽象
-
-    return core_config
-
-
-"""
             LSIS(ls=LSIS.LS.LOAD, nph=0b0111_0100), # vt vth i wgtsum # 电流的也拿出来了
             ADDI(rs=2, imme=-timestep), # 与立即数相比， 如果是 >= 25 则
             CMP(rs=2, rt=2, func=CMP.Func.GE_0), 
@@ -139,6 +90,40 @@ def spaic_stdpexlif_ts_learn_config(timestep=25, th_inc=25, th_sub=1, vreset=-10
             JC(cmpf=0, cmpr=0, addr=32+len_of_update), # 直接跳转 NPC
             GSPRS(rs=0, gspm=GSPRS.GSPM.DEFAULT, rstn=0, gsp=1, vcp=1, rsm=GSPRS.RSM.ZERO), # 正常的脉冲的情况
             LSIS(ls=LSIS.LS.STORE, nph=0b0101_0010), # 把vt存回去 vth_theta存回去 vth 被修改了这里不存回去 loop_i也存回去 
+            NPC(),
+
+
+            LSLS(ls=LSLS.LS.LOAD, pre=0, nph=0b0110_0101), # prt1a-x 输入迹、prt1a-y 输出迹 、prt0-x 输入脉冲、prt0-y输出脉冲 取出 这里可以可以进行衰减操作，反正其余的量我也不用
+            UPTLS(unph=0b0101), # prt1a-x 更新输入迹, prt1a-y 更新输出迹,
+            LSLS(ls=LSLS.LS.STORE, pre=0, nph=0b0000_0101), # 输入迹保存      这个 pre 有什么要求吗
+            NPC(),
+
+
+
+            # 更新 迹 阶段
+
+        ]
+    )
+
+
+    core_config.set_register("CR_VTDEC", int(hex((vreset & 0xffff)<<16), 16)) 
+    core_config.set_register("CR_LI", 0x00) # 每个时刻都进行 更新权重 和 更新学习参数
+    core_config.set_learning_mode(True) # 
+    core_config.set_register("CR_LPARXY", 0x01 | 0x01<<16) # LPAR0 = 1 # 不衰减 LPAR2 = 1
+    core_config.set_register("CR_LPARR", 0x01 << 8 | 0x01<<16) # LPAR5 = 1 # 脉冲系数
+
+    # core_config.set_register("CR_LPARXY", )
+    # core_config.initial_inference_state_memory()
+
+
+
+    # 这么写真抽象
+
+    return core_config
+
+
+"""
+            
 
 
 

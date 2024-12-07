@@ -82,18 +82,40 @@ def spaic_stdpihlif_ts_learn_config(timestep=25, vreset=-100):
     core_config = CoreConfig(
 
         inference_state_settings={
-            # "vth": "my_vth", # 阈值存储器
-            # "i":"my_loop_index",
+            "vth": "my_vth", # 阈值存储器
+            "i":"my_loop_index",
         },
 
         assembly_program=[
             
+            LSIS(ls=LSIS.LS.LOAD, nph=0b0111_0100), # vt vth i wgtsum # 电流的也拿出来了
+            ADDI(rs=2, imme=-timestep), # 与立即数相比， 如果是 >= 25 则
+            CMP(rs=2, rt=2, func=CMP.Func.GE_0), 
+            JC(cmpf=1, cmpr=1, addr=7),
+            SUB(rs=0, rt=0, ns=0), # >= 25 执行  vt = 0 清空电压
+            SUB(rs=2, rt=2, ns=0), # 清空loop_index
+            ADDI(rs=2, imme=-(timestep)), # i = -ts-1
+            ADDI(rs=2, imme=(timestep+1)), #   < 25 执行 # 小于的话 + 1
+            SUB(rs=6, rt=6, ns=0), # r6 = 0 
+            ADDI(rs=6, imme=1), # r6 = 1
+            SUB(rs=3, rt=3, ns=0), # r3 = 0
+            ADD(rs=3, rt=0, ns=0), # r3 = vt
+            ADD(rs=3, rt=0, ns=0), # r3 = 2vt
+            ADD(rs=3, rt=0, ns=0), # r3 = 3vt
+            SFTI(rs=3, sf=SFTI.SF.RIGHT, ns=0, imme=5), # r3 >> 5: r3 = 3/32 vt = 0.093vt
+            ADD(rs=0, rt=3, ns=0), # vt' = vt - 0.01vt = 0.907vt
+            UPTVT(fcs=1, fcph=0), # 更新电压 vt += wgtsum
+            CMP(rs=2, rt=6, func=CMP.Func.EQ),  # 如果rs=2 == 1 # 这里应该是 如果 rs=2 是 1 就不脉冲 gsp参数 是 0
+            JC(cmpf=1, cmpr=1, addr=22), # CMP = True 不jmp 否则jmp
+            GSPRS(rs=0, gspm=GSPRS.GSPM.DEFAULT, rstn=0, gsp=0, vcp=1, rsm=GSPRS.RSM.ZERO), # 复位:是 发放脉冲：否 与阈值比较：是 重置到：rst
+            LSIS(ls=LSIS.LS.STORE, nph=0b0101_0000), # 把vt存回去 vth_theta存回去 vth 被修改了这里不存回去 loop_i也存回去 
+            JC(cmpf=0, cmpr=0, addr=24), # 直接跳转 NPC
+            GSPRS(rs=0, gspm=GSPRS.GSPM.DEFAULT, rstn=0, gsp=1, vcp=1, rsm=GSPRS.RSM.ZERO), # 复位:是 发放脉冲：是 与阈值比较：是 重置到：rst
+            LSIS(ls=LSIS.LS.STORE, nph=0b0101_0000), # 把vt存回去 vth 被修改了这里不存回去 loop_i也存回去 
             NPC(),
 
         ]
     )
     
     core_config.set_register("CR_VTDEC", int(hex((vreset & 0xffff)<<16), 16)) 
-    # core_config.set_learning_mode(True)
-    # core_config.set_register("CR_LI", 0x01)
     return core_config
