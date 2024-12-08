@@ -28,9 +28,9 @@ def spaic_stdpexlif_ts_learn_config(timestep=25, th_inc=25, th_sub=1, vreset=-10
         每timestep 次后 电压清空
     
     """
-    len_of_learning = 3
+    len_of_learning = 5
     len_of_forward = 10
-    len_of_update = 3
+    len_of_update = 5
 
     core_config = CoreConfig(
         inference_state_settings={
@@ -49,12 +49,11 @@ def spaic_stdpexlif_ts_learn_config(timestep=25, th_inc=25, th_sub=1, vreset=-10
 
             # 更新权重阶段 这里每一个神经元都执行了256次
 
-            LSIS(ls=LSIS.LS.LOAD, nph=0b0001_0000), # i
-            LSIS(ls=LSIS.LS.STORE, nph=0b0001_0000), # i
+            LSSYN(ls=LSSYN.LS.LOAD),           # NC_CONF_CR_WORKMODE.E 是 0 不使用拓展
+            UPTSYN(pno=0, nph=UPTSYN.NPH.PRT1A_Y_PRT0_X), # w' = w + wpar0 * p1a-y * prt0-x 输入迹 * 输出脉冲 * 1
+            UPTSYN(pno=1, nph=UPTSYN.NPH.PRT1A_X_PRT0_Y), # w' = w + wpar1 * p1a-x * prto-y 输出迹 * 输入脉冲 * -1
+            LSSYN(ls=LSSYN.LS.STORE),
             NPC(),
-
-
-
 
 
             # 推理阶段
@@ -95,7 +94,7 @@ def spaic_stdpexlif_ts_learn_config(timestep=25, th_inc=25, th_sub=1, vreset=-10
 
             LSLS(ls=LSLS.LS.LOAD, pre=0, nph=0b0110_0101), # prt1a-x 输入迹、prt1a-y 输出迹 、prt0-x 输入脉冲、prt0-y输出脉冲 取出 这里可以可以进行衰减操作，反正其余的量我也不用
             UPTLS(unph=0b0101), # prt1a-x 更新输入迹, prt1a-y 更新输出迹,
-            LSLS(ls=LSLS.LS.STORE, pre=0, nph=0b0000_0101), # 输入迹保存      这个 pre 有什么要求吗
+            LSLS(ls=LSLS.LS.STORE, pre=0, nph=0b0000_0101), # 输入迹保存  由于这个过程在 脉冲发放之后，所以相当于可以拿到这个时刻的脉冲输出， 也可以拿到之前的脉冲输出
             NPC(),
 
 
@@ -111,6 +110,7 @@ def spaic_stdpexlif_ts_learn_config(timestep=25, th_inc=25, th_sub=1, vreset=-10
     core_config.set_learning_mode(True) # 
     core_config.set_register("CR_LPARXY", 0x01 | 0x01<<16) # LPAR0 = 1 # 不衰减 LPAR2 = 1
     core_config.set_register("CR_LPARR", 0x01 << 8 | 0x01<<16) # LPAR5 = 1 # 脉冲系数
+    core_config.set_register("CR_WPARA", 0x01 | int(hex((-1 & 0xff)<<8), 16)) # wpar0 = 1 wpar1 = -1
 
     # core_config.set_register("CR_LPARXY", )
     # core_config.initial_inference_state_memory()
