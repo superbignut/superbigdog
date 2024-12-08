@@ -41,7 +41,7 @@ def spaic_stdpexlif_ts_learn_config(timestep=25, th_inc=25, th_sub=1, vreset=-10
 
         },
         learning_parameter_settings={
-            "PRT1A-X":"1ax",
+            "PRT1A-X":"1ax", # 这里不清零 会出问题
         },
 
 
@@ -50,8 +50,8 @@ def spaic_stdpexlif_ts_learn_config(timestep=25, th_inc=25, th_sub=1, vreset=-10
             # 更新权重阶段 这里每一个神经元都执行了256次
 
             LSSYN(ls=LSSYN.LS.LOAD),           # NC_CONF_CR_WORKMODE.E 是 0 不使用拓展
-            UPTSYN(pno=0, nph=UPTSYN.NPH.PRT1A_Y_PRT0_X), # w' = w + wpar0 * p1a-y * prt0-x 输入迹 * 输出脉冲 * 1
-            UPTSYN(pno=1, nph=UPTSYN.NPH.PRT1A_X_PRT0_Y), # w' = w + wpar1 * p1a-x * prto-y 输出迹 * 输入脉冲 * -1
+            UPTSYN(pno=0, nph=UPTSYN.NPH.PRT1A_X_PRT0_Y), # w' = w + wpar0 * p1a-x * prto-y 输入迹 * 输出脉冲 * 1
+            UPTSYN(pno=1, nph=UPTSYN.NPH.PRT1A_Y_PRT0_X), # w' = w + wpar1 * p1a-y * prt0-x 输出迹 * 输入脉冲 * -1
             LSSYN(ls=LSSYN.LS.STORE),
             NPC(),
 
