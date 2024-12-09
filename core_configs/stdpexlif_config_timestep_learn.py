@@ -41,7 +41,7 @@ def spaic_stdpexlif_ts_learn_config(timestep=25, th_inc=25, th_sub=1, vreset=-10
 
         },
         learning_parameter_settings={
-            "PRT1A-X":"1ax", # 这里不清零 会出问题
+            # "PRT1A-X":"1ax", # 这里不清零 会出问题
         },
 
 
@@ -111,6 +111,7 @@ def spaic_stdpexlif_ts_learn_config(timestep=25, th_inc=25, th_sub=1, vreset=-10
     core_config.set_register("CR_LPARXY", 0x01 | 0x01<<16) # LPAR0 = 1 # 不衰减 LPAR2 = 1
     core_config.set_register("CR_LPARR", 0x01 << 8 | 0x01<<16) # LPAR5 = 1 # 脉冲系数
     core_config.set_register("CR_WPARA", 0x01 | int(hex((-1 & 0xff)<<8), 16)) # wpar0 = 1 wpar1 = -1
+    core_config.set_register("CR_STATE", 0x02)  # 学习状态存储器 清零
 
     # core_config.set_register("CR_LPARXY", )
     # core_config.initial_inference_state_memory()

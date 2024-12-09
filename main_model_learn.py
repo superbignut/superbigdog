@@ -249,7 +249,7 @@ def compile_to_darwin():
     pops_data['layer1']['my_vth'] = ( np.zeros(label_num, ) - 52 * 400 ) # 初始化是-52 # 16位有符号
     pops_data['layer1']['my_loop_index'] = ( np.zeros(label_num, ) ) # 初始化是 0  
 
-    pops_data['layer1']['1ax'] = ( np.zeros(label_num, ) + 0 ) #   迹初始化是 0
+    # pops_data['layer1']['1ax'] = ( np.zeros(label_num, ) + 0 ) #   迹初始化是 0 使用寄存器reset 代替
 
 
     pops_data['layer2'] = {} # layer2 就是lif 0.9 的衰减
