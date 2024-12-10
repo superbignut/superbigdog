@@ -2494,6 +2494,8 @@ class darwin3_device(object):
                         item = f"0 read {x} {y} \""+ hex(0x00800 + offset)+"\" 1\n"
                     elif name == 'config_reg':
                         item = f"0 read {x} {y} \""+ hex(0x00000 + offset)+"\" 1\n"
+                    elif name == 'dedr':
+                        item = f"0 read {x} {y} \""+ hex(0x10000 + offset)+"\" 1\n"
                     else:
                         print('error! not allowed %s', name)
                     # else:
