@@ -547,7 +547,7 @@ class StateMonitor(Monitor):
         # print(square_weights)
         if not im:
             fig, ax = plt.subplots(figsize=figsize)
-
+            print(square_weights.shape)
             im = ax.imshow(square_weights, cmap=cmap, vmin=wmin, vmax=wmax)
             div = make_axes_locatable(ax)
             cax = div.append_axes("right", size="5%", pad=0.05)

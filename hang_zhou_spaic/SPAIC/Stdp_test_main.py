@@ -78,8 +78,8 @@ class TestNet(spaic.Network):
 
 
 Net = TestNet()
-Net.build(backend)
-
+# Net.build(backend)
+Net.reward(1)
 print("Start running")
 
 eval_losses = []
