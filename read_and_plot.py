@@ -178,4 +178,4 @@ if __name__ == '__main__':
 
     plot_weight_func() # 画量化 的权重 
     darwin_plot_weight_func() # 画出从darwin 读出来的权重
-    print(np.mean((w_after_darwin - w_before_darwin) ** 2))
+    print(np.sum((w_after_darwin - w_before_darwin) ** 2))
