@@ -77,7 +77,7 @@ class nearest_online_STDP(Base_STDP):
             #     for i in range(weight.shape[0]):
             #         weight[i] = (weight[i] * self.w_norm) / torch.sum(torch.abs(weight[i]))
 
-            weight[...] = (self.w_norm * torch.div(weight, torch.sum(torch.abs(weight), 1, keepdim=True)))
+            weight[...] = (self.w_norm * torch.div(weight, torch.sum(torch.abs(weight), 1, keepdim=True))) # 原地操作
             weight.clamp_(0.0, 1.0)
             # torch.save(weight, 'weight_3.pth') # 问一下梦晓 为什么这里的权重 和 监视器中的不一样呢？？？
             return weight

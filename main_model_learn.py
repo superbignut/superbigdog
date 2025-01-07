@@ -198,8 +198,9 @@ def compile_to_darwin():
     from core_configs.stdpihlif_config_timestep import spaic_stdpihlif_ts_config
     from core_configs.stdpexlif_config_timestep_learn import spaic_stdpexlif_ts_learn_config
     from core_configs.stdpihlif_config_timestep_learn import spaic_stdpihlif_ts_learn_config
+    from core_configs.test import test_lif
 
-    time_step = 25
+    time_step = 50
 
     input_node_num = 256
 
