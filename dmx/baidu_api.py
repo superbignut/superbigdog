@@ -14,11 +14,11 @@ import sys
 from filelock import FileLock
 import traceback
 
-file_path = "output.wav"
+# file_path = "output.wav"
 API_KEY = "uXF2wBd5nWGfay9qfJzhkPO3"
 SECRET_KEY = "3bghdtbtwYc1M0FINptHjz5fEZNVjvpe"
 # wav 文件转 文本
-def baidu_wav_to_words():
+def baidu_wav_to_words(file_name):
 
     def get_access_token():
         """
@@ -33,8 +33,8 @@ def baidu_wav_to_words():
     url = "https://vop.baidu.com/server_api"
 
     
-    speech = get_file_content_as_base64(file_path, False)
-    sp_len = os.path.getsize(file_path)
+    speech = get_file_content_as_base64(file_name, False)
+    sp_len = os.path.getsize(file_name)
         
     payload = json.dumps({
         "format": "wav",
