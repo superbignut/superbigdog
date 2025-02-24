@@ -282,7 +282,7 @@ ls = np.zeros(100,)
 if __name__ == "__main__":
     # train()
     # single_test()
-    # quant()
+    quant()
     compile_to_darwin()
 
 

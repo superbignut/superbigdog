@@ -224,3 +224,73 @@ Todo:
 
 Todo:
   + 可以把声音的图像动态的画出来了，接下来想着怎么做一个滑动窗口，然后也可以做并发？
+
+用状态机也算是实现了 语音输入的更合理的检测
+
+Todo：
+  + python 有一个FER的库可以做视觉的人脸的情感识别，底层还是训练的网络，可能 可以用
+  + 联想的话， 感觉其实可以做一个简单的 用snn人脸识别的， 都不用是情感识别，只要能识别出主人，我觉得就ok了
+
+
+Todo:
+  + 之前一直在 input_func 之中 减小发放的概率 否则  很多 激活层神经元都会脉冲, 其实是因为 阈值没有经过放大导致的, 并且 -20 和 -120 是不是 也要放大一下才好
+
+  ```python
+    def input_func(input_ls, unit_conversion=0.4, dt=0.1):# 这连个参数对标spaic的possion_encoder
+      # 这里加了一层 随机性, 但其实还是要在 阈值放大来看,而不是 在这里一度的缩小
+      a = (np.random.rand(*input_ls.shape) < input_ls * unit_conversion * dt) # a 是一个 true 和 false 的同维度 array
+      return np.nonzero(a[0].astype(int))[0] # 返回一个 nozero 的 list  这里体现除了 darwin 的输入特点， 只对需要的内容 输入， 0代表的是 0 号神经元输入，
+  ```
+  + todo 也就是 考虑一个 阈值 和 后两层 权重  的 放大方式
+    
+  
+
+---
+
+
+
+> 现提交一版代码， 这一版代码是可以看到stdp 权重变化的， 但有一些地方需要注意：
+
+
+  + 首先是 达尔文的 9 号精度寄存器 需要手动修改
+
+```cpp
+    core_config.set_register("CR_QA", (0x4 << 8)) 
+    # 状态更新阶段精度 16位 随机取整 *15/16 右移 4位  
+    # 这里要 将 0-2 config.dwnc 中该称 0 write 0 2 0x0008 0x00000400 
+```
+
+  + 其次是 stdp 算法的参数, 改成 +1 和 -1 ，当然其他参数也可以，但暂时 用的这个, 强化的 效果还行
+
+```cpp
+    core_config.set_register("CR_WPARA", 0x01 | int(hex((-1 & 0xff)<<8), 16)) # wpar0 = 1 wpar1 = -1 # 这里的5 和 -5 应该改成 1 1奥 
+```
+
+  + 第三个要注意的是 timestep 时钟周期，main_model_learn.py 中的 编译使用的 time_step 要和 真正运行时的 range 中的数值保持一致
+
+```python
+def step():
+    ls = np.zeros(100,)
+    test.clear_neurons_states(LSC=True)
+    for _ in range(25):                   # 说的是这里
+        input_ls = np.array([[1 if i==1 or i == 4 else 0.01 for i in range(16)] * 16])
+        a = input_func(input_ls)
+        # print(a)
+
+        out = test.run_darwin3_withoutfile(spike_neurons=[a])
+        
+        for i in range(len(out[0])):
+            index = out[0][i][1]
+            ls[index] += 1 
+    print(ls.nonzero())
+```
+
+  + 最后一个地方是，泊松编码输入的地方, 其中有一个缩放系数 unit_conversion , 其实这里是由于 阈值没放大正确, 放大了的话, 这里的作用应该只是, 调节脉冲的稀疏程度, 目前的参数使用的是 0.8
+
+```python
+    def input_func(input_ls, unit_conversion=0.8, dt=0.1):
+```
+
+
+
+---
