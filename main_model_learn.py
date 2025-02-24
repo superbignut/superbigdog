@@ -101,6 +101,7 @@ def quant():
     class Symmetric_Quantize:
         class Target_Precision(Enum):
             INT8=127 #  #  这里暂时先用这个试一试
+            INT16=32767
     
         def __init__(self, precision):
             self.upper_bound = precision.value
@@ -124,11 +125,26 @@ def quant():
 
             return _quant_loss, _scalar_factor, _new_weight # 返回量化损失，缩放因子，缩放后的权重
             
+        def _get_scale_factor_score_weight_unit(self, q, weight):
+            # 这里相对于原来的量化方式 ，这里的应该是 统一量化， 之前的应该是 分神经元 量化
+
+            topq = torch.abs(weight).flatten(1).quantile(dim=1, q=q) 
+            
+            _scalar_factor = torch.sum(self.upper_bound / topq) / len(topq) # 求了量化因子 的平均值
+            # print("scalar_factor is :", _scalar_factor)
+
+            _new_weight = torch.clamp(torch.round(_scalar_factor * weight), min=self.lower_bound, max=self.upper_bound)
+            # print(_new_weight)
+
+            _quant_back = _new_weight / _scalar_factor# [:, None]
+            _quant_loss = torch.nn.functional.mse_loss(_quant_back, weight)
+
+            return _quant_loss, _scalar_factor, _new_weight # 返回量化损失，缩放因子，缩放后的权重
         
         
         def search_reasonable_quant_weight(self, weight):
             # 这里就不选了， 直接用0.97
-            _score, _scalar_factor, _new_weight = self._get_scale_factor_score_weight(q=self.q, weight=weight)
+            _score, _scalar_factor, _new_weight = self._get_scale_factor_score_weight_unit(q=self.q, weight=weight)
             print("origin_weight", weight)
             print("quant_loss is: ", _score)
             print("scalar_factor is: ", _scalar_factor)
@@ -148,6 +164,16 @@ def quant():
     weight_value = torch.load(r'C:\Users\bignuts\Desktop\ZJU\hang_zhou\alcohol\hang_zhou_spaic\save_600\real_ysc_model_mic\parameters\_parameters_dict.pt')
 
     _scalar_factor, _new_weight= quant_obj(weight_value['autoname1<net>_connection1<con>:autoname1<net>_layer1<neg><-autoname1<net>_input<nod>:{weight}']) # 量化权重
+    # print(torch.sum(_scalar_factor), len(_scalar_factor))
+
+    torch.save(_scalar_factor, f="_scalar_factor.pth")
+    # average_scalar_factor = torch.sum(_scalar_factor) / len(_scalar_factor)
+
+    # print(_scalar_factor.detach().cpu().numpy())
+    
+    #  print(np.clip(np.zeros(100, ) - np.round(40 * _scalar_factor.detach().cpu().numpy()), a_min=-32767, a_max=32767))
+
+    # print("average scalar factor is: ", average_scalar_factor) # 这里 使用 平均后 的缩放因子 来 放大达尔文上 的神经元参数 如 阈值、静息电压等
 
     vth_level = Symmetric_Quantize.Target_Precision.INT8.value
 
@@ -159,13 +185,13 @@ def quant():
 
     th_inc = 24 # 0.05 * 490
 
-    _new_vth = torch.clamp(vth_origin * _scalar_factor, min=-vth_level, max=vth_level).detach().cpu().numpy()[0].item()
+    # _new_vth = torch.clamp(vth_origin * _scalar_factor, min=-vth_level, max=vth_level).detach().cpu().numpy()[0].item()
 
 
     torch.save(_new_weight, f='quant_input_layer1.pth')
 
 
-    print("_new_vth is: ", _new_vth)
+    # print("_new_vth is: ", _new_vth)
 
 def delete_dir_file(dir_path, root_dir_rm=False):
     """
@@ -206,6 +232,12 @@ def compile_to_darwin():
 
     label_num = 100
 
+    _scalar_factor = torch.load(f="_scalar_factor.pth")
+    
+    _scalar_factor = np.sum(_scalar_factor.detach().cpu().numpy()) / 100 / 2 # 这里 会超量程 所以 取了一半 取值 400 
+
+    # print(_scalar_factor)
+
     input0_neurons = PhysicalPopulation(shape=[input_node_num, ], coord=[-1, 1], pop_position="input") # 使用负坐标， 表示不在darwin上
     layer1_neurons = PhysicalPopulation(shape=[label_num,  ], coord=[ 0, 2]) #
     layer2_neurons = PhysicalPopulation(shape=[label_num,  ], coord=[ 0, 3]) #
@@ -230,11 +262,11 @@ def compile_to_darwin():
     
 
     add_connections('full',   
-                    weight=np.diag(np.ones(label_num)) * 22, 
+                    weight=np.diag(np.ones(label_num)) * 22 * 5, # 这里的 5  对 下一层连接进行补偿
                     pre_pops=layer1_neurons, 
                     post_pops=layer2_neurons) # 
     add_connections('full',   
-                    weight=( np.ones((label_num, label_num)) - np.diag(np.ones(label_num)) ) * (-120), 
+                    weight=( np.ones((label_num, label_num)) - np.diag(np.ones(label_num)) ) * (-120),  #  由于 这里已经无法进一步 放大， 所以对上一层连接 进行放大
                     pre_pops=layer2_neurons, 
                     post_pops=layer1_neurons) # 
     add_connections('output', 
@@ -255,8 +287,8 @@ def compile_to_darwin():
 
     pops_data['layer2'] = {} # layer2 就是lif 0.9 的衰减
     # vreset 的 区间是 -32768 ~ 32768 是 16位有符号寄存器
-    pops_data['layer2']['core_config'] = spaic_stdpihlif_ts_learn_config(vreset=-45*400, timestep=time_step) #     25    1  
-    pops_data['layer2']['my_vth'] = ( np.zeros(label_num, ) - 40 * 400 ) # 初始化是-52 # 16位有符号
+    pops_data['layer2']['core_config'] = spaic_stdpihlif_ts_learn_config(vreset=-45, timestep=time_step) #     25    1  
+    pops_data['layer2']['my_vth'] = ( np.zeros(label_num, ) - 40) # 初始化是-52 # 16位有符号
     pops_data['layer2']['my_loop_index'] = ( np.zeros(label_num, ) ) # 初始化是 0 
 
     pops_data_config = PopsDataConfig()
@@ -296,9 +328,9 @@ ls = np.zeros(100,)
 if __name__ == "__main__":
     # train()
     # single_test()
-    # quant()
+    quant()
     
-    compile_to_darwin()
+    # compile_to_darwin()
 
 
 # vt 会不会超量程 ？？？
