@@ -21,15 +21,6 @@ imu_y_publisher = rospy.Publisher('/queue/sum_y', Float32, queue_size=10)
 x_buffer = deque(maxlen=30, iterable=[0 for _ in range(30)])
 y_buffer = deque(maxlen=30, iterable=[0 for _ in range(30)]) # 长一点， 这样的话，更新的慢一点 
 
-def shuo_zhong_wen(input_txt):
-    # text = "我是李龙,今天天气真好啊。"
-    text = input_txt
-    command = 'espeak -v zh "{}"'.format(text)
-
-    # 调用系统命令并执行
-    subprocess.call(command, shell=True)
-
-
 current_time = time.time()
 last_trigger_time = current_time
 trigger_duration = 2.0 # 秒内触发一次
@@ -54,9 +45,9 @@ def imu_callback(data, index): # 可以不断的获取 imu 数据的函数
             is_static = False
 
     if index == 1 and is_static == True:
-        x = data.linear_acceleration.x;
-        y = data.linear_acceleration.y;
-        z = data.linear_acceleration.z;
+        x = data.linear_acceleration.x
+        y = data.linear_acceleration.y
+        z = data.linear_acceleration.z
         
         x_buffer.append(abs(x)) # 都取正
         y_buffer.append(abs(y))
@@ -100,7 +91,7 @@ def imu_listener():
 
     # 订阅 /imu/data 主题
     rospy.Subscriber('/imu/data', Imu, lambda data: imu_callback(data, 1))
-    rospy.Subscriber('/ltl_robot_basic_states', Int32, lambda data: imu_callback(data, 2))
+    # rospy.Subscriber('/ltl_robot_basic_states', Int32, lambda data: imu_callback(data, 2))
 
     # 循环等待回调
     rospy.spin()
