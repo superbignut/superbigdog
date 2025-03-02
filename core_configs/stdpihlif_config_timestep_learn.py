@@ -118,4 +118,5 @@ def spaic_stdpihlif_ts_learn_config(timestep=25, vreset=-100):
     )
     
     core_config.set_register("CR_VTDEC", int(hex((vreset & 0xffff)<<16), 16)) 
+    # core_config.set_register("CR_QA", (0x4 << 24))
     return core_config

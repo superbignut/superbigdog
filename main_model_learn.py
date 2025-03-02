@@ -266,7 +266,7 @@ def compile_to_darwin():
                     pre_pops=layer1_neurons, 
                     post_pops=layer2_neurons) # 
     add_connections('full',   
-                    weight=( np.ones((label_num, label_num)) - np.diag(np.ones(label_num)) ) * (-120),  #  由于 这里已经无法进一步 放大， 所以对上一层连接 进行放大
+                    weight=( np.ones((label_num, label_num)) - np.diag(np.ones(label_num)) ) * (-60 * 2),  #  由于 这里已经无法进一步 放大， 所以对上一层连接 进行放大
                     pre_pops=layer2_neurons, 
                     post_pops=layer1_neurons) # 
     add_connections('output', 
@@ -328,9 +328,9 @@ ls = np.zeros(100,)
 if __name__ == "__main__":
     # train()
     # single_test()
-    quant()
+    # quant()
     
-    # compile_to_darwin()
+    compile_to_darwin()
 
 
 # vt 会不会超量程 ？？？
