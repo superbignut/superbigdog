@@ -27,7 +27,7 @@ class RoIHumanDetMP:
         else:
             self.person = None
 
-        return self.person
+        return self.person # [face_bbox, landmarks, score] 这里的 landmarks 是身体的关键点，我猜有肩点之类的
 
     def get_face_RoI(self):
         if self.person is None:
@@ -40,6 +40,16 @@ class RoIHumanDetMP:
         shoulder_point = person_landmarks[2]
         upper_body = person_landmarks[3]
         return self.__get_RoI(shoulder_point, upper_body)
+    
+    def get_cloth_RoI(self):
+        # 这里被改成了可以截取上半身衣服的框框
+        #  hip center point; full body point; shoulder center point; upper body point;
+        person_landmarks = self.person[4:-1].reshape(4, 2) # 这里就是 返回两个 坐标的
+        shoulder_point = person_landmarks[2]
+        hip_point = person_landmarks[0]
+        print("shoulder is ", shoulder_point, "hip is ", hip_point)
+
+        return self.__get_RoI((shoulder_point + hip_point) / 2, hip_point)
 
     def get_full_RoI(self):
         person_landmarks = self.person[4:-1].reshape(4, 2)

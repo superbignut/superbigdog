@@ -97,6 +97,7 @@ if __name__ == '__main__':
         # detect RoI by human detection
         bbox = human_RoI_mp.detect(frame)
         image = frame
+        gestures = None
         # find a person by MediaPipe human detection
         if bbox is not None:
             # usually upper body RoI can be gotten
@@ -108,20 +109,25 @@ if __name__ == '__main__':
             # face_RoI = face_RoI_yunet.get_face_RoI()
             # mask_detector.detect(frame, face_RoI)
             # print(bbox)
-            cv.rectangle(image, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (0, 255, 0), 1) # 这里把人的位置画出来
-        
+            cloth = human_RoI_mp.get_cloth_RoI()
+            # print(bbox)
+            if cloth is not None:
+                cloth = cloth.reshape(-1)
+                cv.rectangle(image, (int(cloth[0]), int(cloth[1])), (int(cloth[2]), int(cloth[3])), (0, 255, 0), 1) # 这里把人的位置画出来
+
+            image = hand_gesture.visualize(image) # 手势可视化 与连线
         # if human detection can't find a person, try NanoDet # 另一种方法
-        else:
+        """ else:
             continue # 这里暂时先用一种方法
             bbox = human_RoI_nano.detect(frame)
             human_RoI = human_RoI_nano.get_human_RoI()
-            gestures, area_list = hand_gesture.estimate(frame, human_RoI)
+            gestures, area_list = hand_gesture.estimate(frame, human_RoI) """
             # face_RoI_yunet.detect(frame, human_RoI)
             # face_RoI = face_RoI_yunet.get_face_RoI()
             # mask_detector.detect(frame, face_RoI)
 
         # visualize
-        image = hand_gesture.visualize(image) # 手势可视化 与连线
+            
         # image = mask_detector.visualize(image, "mask")
 
         cv.imshow("Demo", image)
@@ -135,7 +141,7 @@ if __name__ == '__main__':
             break
 
         # control robot dog
-        if gestures.shape[0] != 0: # gestures有两个维度 第一个应该是 图像 第二个是分类结果
+        if gestures is not None and gestures.shape[0] != 0: # gestures有两个维度 第一个应该是 图像 第二个是分类结果
             # only use the biggest area right hand
             idx = area_list.argmax()
             gesture_buffer.insert(0, gestures[idx])
