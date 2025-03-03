@@ -1,6 +1,7 @@
 """
-    这个文件相较于 main.py 目的在于把原来用  spaic 的网络传播 改成用 Darwin3 的完全替代 尽量做到接口函数都不变
-    只修改 step 函数
+    这个文件相较于 main.py 目的在于把原来用  spaic 的网络传播 改成用 Darwin3 的完全替代 
+
+    并增添了指令部分 修改了整个情感对四足机器人影响的方式
 """
 import os
 import sys
@@ -15,7 +16,7 @@ import os
 import sys
 import random
 import torch
-
+from enum import Enum
 import torch.nn.functional as F
 import multiprocessing
 import csv
@@ -29,11 +30,6 @@ import time
 import subprocess
 import wave
 import pyaudio
-
-"""
-    | 0     1     2    3  |   4    5  |  6    7  |  9      10  |   11    12     13 |     14    15   |   8    |
-    | 白    红    蓝  表扬 |  红    蓝 |  酒   酒 |  表扬   批评 |   上    下     挥  |    电低  电低  |   白    |     
-"""
 
 EMO = {"POSITIVE":0, "NEGATIVE":1, "ANGRY":2, "NULL_P":3, "NULL_N":4} # NULL(只在没有输入的时候使用 ), 积极，消极，愤怒
 
@@ -64,30 +60,18 @@ def _bo_fang(index):
             file_name = "wang_wang.wav"
         elif index == 2:
             file_name = "woof_sad.wav"
-        # 打开.wav文件
+        
         file_path = os.path.join(os.path.dirname(__file__), file_name)
-        wf = wave.open(file_path, 'rb')
+        wf = wave.open(file_path, 'rb')        
 
-        # 创建PyAudio对象
-        p = pyaudio.PyAudio()
-
-        # 打开音频流
-        stream = p.open(format=p.get_format_from_width(wf.getsampwidth()),
-                        channels=wf.getnchannels(),
-                        rate=wf.getframerate(),
-                        output=True)
-
-        # 播放数据
-        data = wf.readframes(1024)
+        p = pyaudio.PyAudio()           # 创建PyAudio对象
+        stream = p.open(format=p.get_format_from_width(wf.getsampwidth()),channels=wf.getnchannels(),rate=wf.getframerate(),output=True)        
+        data = wf.readframes(1024)      # 播放数据
         while data:
             stream.write(data)
             data = wf.readframes(1024)
-
-        # 停止音频流
         stream.stop_stream()
         stream.close()
-
-        # 关闭 PyAudio
         p.terminate()
         wf.close()
     except:
@@ -95,10 +79,6 @@ def _bo_fang(index):
     finally:
         print("audio played over!")
 
-"""
-    | 0     1     2    3  |   4    5  |  6    7  |  9      10  |   11    12     13 |     14    15   |   8    |
-    | 白    红    蓝  表扬 |  红    蓝 |  酒   酒 |  表扬   批评 |   上    下     挥  |    电低  电低  |   白    |     
-"""
 class Darwin_Net():
     def __init__(self):
         super().__init__()
@@ -109,10 +89,8 @@ class Darwin_Net():
 
         self.time_step = 25
 
-        self.board = self.ysc_darwin_init() # 初始化了板子
+        self.board = self.ysc_darwin_init() # 初始化板子
 
-        
-    
     def ysc_darwin_init(self):
         # darwin 板子初始化 ，参考运行时手册
         board = darwin3_device.darwin3_device(app_path='API_4.0/apps/', step_size=1000_000, ip=['172.31.111.35'], spk_print=True) # 172.31.111.35
@@ -156,9 +134,8 @@ class Darwin_Net():
         return self.ysc_darwin_step(data)
     
     def new_check_label_from_data(self, data):
-        """
-            这里暗含了优先级的概念在里面, 但要是能真正影响 情绪输出的还得是 权重
-        """
+        # 这里暗含了优先级的概念在里面, 但要是能真正影响 情绪输出的还得是 权重
+        
         if data[0][2] == 1 or data[0][5] == 1 or data[0][10] == 1 or data[0][12] == 1:
             return EMO["ANGRY"] # 
         
@@ -249,36 +226,65 @@ class Darwin_Net():
             
             # Todo 有待补充
 
+
+
 class Gouzi:
+    class Sensor(Enum):
+        # 各种检测到的传感器 编码输入数据 和 指令数据的状态
+        Null = 0                    # 这个就是 各个信号0的状态
+
+        IMU_Touching = 1            # 抚摸 * 2
+        IMU_Hit = 2                 # 拍打
+
+        Color_Red = 1               # 红颜色
+        Color_Blue = 2              # 蓝颜色
+        Color_Black = 3             # 黑颜色
+
+        Dmx_Positive = 1            # 积极语义
+        Dmx_Negative = 2            # 消极语义 * 2
+
+        Other_Power = 1             # 电量低 * 3
+        Other_Alcohol = 2           # 酒精浓度高
+
+        Gesture_Like = 1            # 点赞手势
+        Gesture_Dislike = 2         # 点踩手势
+        Gesture_Palm = 3            # 手掌手势
+
+        # 总体输入编码的维度是 16, 除此之外，下面的信号被用来作为四足机器人的指令变量
+
+        Cmd_LieDown = 1             # 趴下指令
+        Cmd_StandUp = 2             # 站起来指令
+        Cmd_GoAhead = 3             # 向前走指令
+        Cmd_GoBack = 4              # 向后走指令
+        Cmd_Woof = 5                # 往往叫指令
+        
+        # Todo 当然还有更多样的指令，扭一扭、跟随之类的，先不弄
 
     def __init__(self) -> None:
 
-        #### 全局变量， 从socket线程中修改， 用于 self.net 的前向推理
-        self.imu = 0 #  0 1 2     无、抚摸， 抚摸+、敲打、敲打+   5
-        self.color = 0 #  0 1 2  无， 蓝色， 红色                3
-        self.alcohol = 0 #  0 1 2   无， 酒精 酒精               3
-        self.dmx = 0 # 0 1 2 3 # 无，积极，消极                  3
-        self.gesture = 0 # 0 1 2 3 无  上，下，挥手              4
-        self.power = 0 # 0 1 # 20% 以下， 和以上的电量           2
+        self.imu = self.Sensor.Null
+        self.color = self.Sensor.Null
+        self.alcohol = self.Sensor.Null
+        self.dmx = self.Sensor.Null
+        self.gesture = self.Sensor.Null
+        self.power = self.Sensor.Null
+        self.cmd = self.Sensor.Null
 
-        self.robot_net = Darwin_Net() # 
+        self.robot_net = Darwin_Net() # 情感模型网络
         
         self.state_update_lock = threading.Lock() # 这个lock 使用来检测 狗的状态的更新的， 在检测线程 和 clear 线程中使用
 
-        self.emo_thread = threading.Thread(target=self.emo_handle_thread, name="emo_handle_thread")
+        self.cmd_thread = threading.Thread(target=self.cmd_waiting_thread, name="action_thread") # 命令线程
 
-        self.action_thread = threading.Thread(target=self.action_handle_thread, name="action_thread") # 动作线程还没做
-
-        self.controller = None
+        self.controller = None # 控制器
         
-        self.action_socket_init() # 初始化 Controller, 
+        self.action_socket_init() # 初始化 Controller
 
         self.is_moving = False
 
     
     def action_socket_init(self):
         # 运动主机初始化、创建运动控制器、建立心跳
-        # client_address = ("192.168.1.103", 43897)
         server_address = ("192.168.1.120", 43893)  # 运动主机端口
         self.controller = Controller(server_address) # 创建 控制器
 
@@ -290,167 +296,146 @@ class Gouzi:
         # controller.send(pack) # 
         time.sleep(2)
         self.controller.not_move() # 进入 静止状态
-        print("动作socket初始化")
-
-        
-        """
-            | 0     1     2    3  |   4    5  |  6    7  |  9      10  |   11    12     13 |     14    15   |   8    |
-            | 白    红    蓝  表扬 |  红    蓝 |  酒   酒 |  表扬   批评 |   上    下     挥  |    电低  电低  |   白    |     
-        """
+        print("action socket init...")
 
     def start(self):
-
+        # 外部调用，启动指令监听线程
+        # Gouzi 启动完毕
         self.robot_net.load_weight_and_buffer(model_path="save_600/real_ysc_model_mic", buffer_path='real_ysc_buffer_600_mic.pth') # 这里以后还可以换成 其他训练轮数的模型
 
-        self.emo_thread.start() # 情感线程启动
+        self.say_something(index=1) # 汪汪一下
 
-        self.say_something(index=1)
+        self.cmd_thread.start() # 启动
 
-        self.action_thread.start() # 启动 运动执行模块
-
-        print("into server")
+        print("Gouzi into socket server...")
         
         self.start_server() # 启动监听线程 ， 线程中不断获取传感器数据
 
+
+    def start_server(self, host='192.168.1.103', port=12345):
+        # 启动client 监听线程
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.bind((host, port))
+        server_socket.listen(5) # 等待数， 连接数
+        print(f"Server listening on {host}:{port}...")
+
+        while True:
+            client_socket, addr = server_socket.accept() # 这里会阻塞
+            print(f"Connection from {addr}")
+            client_handler = threading.Thread(target=self.client_handle_thread, args=(client_socket,))
+            client_handler.start()
+
     def say_something(self, index):    
-            
-            # temp_p = multiprocessing.Process(target=_bo_fang, args=(index, ))
-            temp_t = threading.Thread(target=_bo_fang, name="bo_fang_thread", args=(index, ))
-            temp_t.start() # 这里 因为麦克风是 io 且是独占的，所有 多线程可以加速， 并且 需要join
-            temp_t.join()
-            # _bo_fang(index=index)
-            print("播放结束")
-    
-    def positive_action_with_flag_changed(self): # 做一些积极的动作， 并标志flag
-        #########################################
-        self.is_moving = True
-        #########################################
-
-        self.controller.zuo_you_huang()
-        time.sleep(1)
-        self.controller.thread_active = False
-        
-        #########################################
-        # 执行完所有动作后
-        self.emo_queue.popleft()
-        self.is_moving = False
-        #
-        ########################################
-    def negative_action_with_flag_changed(self): # 做一些消极的动作， 并标志flag
-        #########################################
-        self.is_moving = True
-        #########################################
-
-        
-        self.controller.low_height_of_dog()
-        time.sleep(1)
-        self.controller.thread_active = False
-        time.sleep(1)
-
-        #########################################
-        # 执行完所有动作后
-        self.emo_queue.popleft()
-        self.is_moving = False
-        #
-        ########################################
+        # 调用外部函数，播放音频
+        temp_t = threading.Thread(target=_bo_fang, name="bo_fang_thread", args=(index, ))
+        temp_t.start() # 这里 因为麦克风是 io 且是独占的，所有 多线程可以加速， 并且 需要join
+        temp_t.join()
+        print("播放结束")
 
     
-    def clear(self):
+    def clear_sensor_status_with_lock(self):
+        # 清除传感器状态变量，清除前加锁
+        
         with self.state_update_lock:
-            self.imu = 0
-            self.color = 0
-            self.alcohol = 0
-            self.dmx = 0
-            self.gesture = 0
-            self.power = 0
-                
-            """
-                | 0     1     2    3  |   4    5  |  6    7  |  9      10  |   11    12     13 |     14    15   |   8    |
-                | 白    红    蓝  表扬 |  红    蓝 |  酒   酒 |  表扬   批评 |   上    下     挥  |    电低  电低  |   白    |     
-            """
+            
+            self.imu = self.Sensor.Null
+            self.color = self.Sensor.Null
+            self.alcohol = self.Sensor.Null
+            self.dmx = self.Sensor.Null
+            self.gesture = self.Sensor.Null
+            self.power = self.Sensor.Null
+            
+            self.cmd = self.Sensor.Null
+
 
     def cmd_waiting_thread(self):
-        """
-            0 每次检测各个传感器信号， 判断是不是指令
-            1 如果是指令，则找到情感输出
-            2 融合后动作输出
-        """
+        # Gouzi 交互逻辑主线程
+
+        # 0 每次检测各个传感器信号， 判断是不是指令
+        # 1 如果是指令，则找到情感输出
+        # 2 融合指令和情感后 动作输出
+        # 3 动作输出后 进入窗口期 等待倒计时结束
+            # 4 期间如果有评价信号，则调节情感模型buffer
+            # 5 期间如果有指令信号，则进入下一次指令周期
+            # 6 倒计时结束
+        
         while True:
             
-            temp_input = [0 for _ in range(input_node_num_origin)]
-            is_activate = None
+            temp_input = np.zeros(input_node_num_origin) # 初始传感器维度, 传感器初始化
             
-            def _check_input():
-                if self.color == 2:
-                    temp_input[4] = 1 # 红
+            """
+                实际的传感器排序就如下面所示，输入给模型的编码输入就是 下面的 16 * 16
+
+                | 0     1     2    3      |   4    5   |  6     |  7     8     9   |   10    11   |  12    |  13    14    15  |
+                | 蓝    红    黑  表扬语义 |  批评  批评 | 酒精高  | 点赞  点踩   手掌 |  抚摸  抚摸  |   拍打  | 电低  电低  电低  |     
+            """
+            def _check_sensor_input():
+                # 传感器信号 检测 并转为 编码输入
+
+                # 颜色
+                if self.color == self.Sensor.Color_Blue:
+                    temp_input[0] = 1
+                elif self.color == self.Sensor.Color_Red:
                     temp_input[1] = 1
-
-                if self.alcohol == 1:
-                    temp_input[6] = 1
-                    temp_input[7] = 1
+                elif self.color == self.Sensor.Color_Black:
+                    temp_input[2] = 1
                 
-                if self.dmx == 1:
-                    temp_input[9] = 1
-                    temp_input[3] = 1                    
-                elif self.dmx ==2:
-                    temp_input[10] = 1
+                # 语义
+                if self.dmx == self.Sensor.Dmx_Positive:
+                    temp_input[3] = 1
+                elif self.dmx == self.Sensor.Dmx_Negative:
+                    temp_input[4] = 1
+                    temp_input[5] = 1
 
-                if self.gesture == 1 or self.gesture == 3:
+                # 酒精
+                if self.alcohol == self.Sensor.Other_Alcohol:
+                    temp_input[6] = 1                    
+                
+                # 手势
+                if self.gesture == self.Sensor.Gesture_Like:
+                    temp_input[7] = 1
+                elif self.gesture == self.Sensor.Gesture_Dislike:
+                    temp_input[8] = 1
+                elif self.gesture == self.Sensor.Gesture_Palm:
+                    temp_input[9] = 1
+
+                # IMU
+                if self.imu == self.Sensor.IMU_Touching:
+                    temp_input[10] = 1
                     temp_input[11] = 1
-                    temp_input[13] = 1
-                elif self.gesture == 2:
+                elif self.imu == self.Sensor.IMU_Hit:
                     temp_input[12] = 1
                 
-                if self.power == 1:
-                    temp_input[14] = 1 
-                    temp_input[15] = 1            
+                # 电量
+                if self.power == self.Sensor.Other_Power:
+                    temp_input[13] = 1
+                    temp_input[14] = 1
+                    temp_input[15] = 1
             
+            if self.cmd != self.Sensor.Null:                                    # 如果有指令输入，从daerwin得到情感输出
+                
+                temp_input = np.array([temp_input * input_num_mul_index])       # 增加了一个维度  
+
+                temp_output = self.robot_net.step(data=temp_input, reward=1)    # 前向传播
+
+                print("temp_output is :",temp_output)
+                
+
             
-            is_moving_flag = False
             # 这里打算等待imu 等待 1 秒钟， 如果有imu 交互输入 就 在线学习， 否则就 正常推理
             start_time = time.time()
 
             while time.time() - start_time < 1: # 在检查imu 的间隙 检查 其他输入
-                if self.is_moving: # 如果正在运动，也是不进行前向传播
-                    self.clear()
-                    is_moving_flag = True
-                    break
-                
-                _check_input() # 继续检测输入
-
-                if self.imu == 1: # 摸
-                    is_activate = INTERACT["POSITIVE"]
-                    break
-                elif self.imu == 2:
-                    is_activate = INTERACT['NEGATIVE']
-                    break
                 
                 time.sleep(0.1)  # 每 0.1 秒检测一次
 
-            if is_moving_flag == True:
-                continue 
-            elif sum(temp_input) < 1:  # 
-                if is_activate is INTERACT['POSITIVE']: # 如果没有输入 只有交互 那就 制作简答的动作
-                    print("简单 输出")
-                    self.emo_queue_add_in_lock(data=EMO["NULL_P"]) # 表示只有只需要简答的动作
-                    self.clear()
-                    continue
-                elif is_activate is INTERACT['NEGATIVE']:
-                    self.emo_queue_add_in_lock(data=EMO["NULL_N"]) # 表示只有简单的动作
-                    self.clear()
-                    print("简单 输出")
-                    continue
-                else:
-                    continue
-
-            print("input is : ", temp_input) # 有输入的情况
-
-            self.clear() # 清除状态
             
-            temp_input = torch.tensor(temp_input * input_num_mul_index, device=device).unsqueeze(0) # 增加了一个维度  
+            
+            
 
-            temp_output = self.robot_net.step(data=temp_input, reward=1) # 前向传播
-            print("temp_output is :",temp_output.shape)
+            self.clear_sensor_status_with_lock() # 清除状态
+            
+            
 
             darwin_output = self.ysc_darwin_step(input_ls=temp_input) # 这里的输出是numpy，可能需要转成tensor 才行
             print("darwin_output is: " ,darwin_output.shape)
@@ -459,28 +444,24 @@ class Gouzi:
 
             real_label = None
 
-            if is_activate == INTERACT['POSITIVE']:
-                # 抚摸输入
-                self.robot_net.influence_all_buffer(interact=INTERACT["POSITIVE"], temp_output=temp_output)
-                print("向积极方向修正")
-            elif is_activate == INTERACT["NEGATIVE"]:
-                # 踢打输入
-                self.robot_net.influence_all_buffer(interact=INTERACT["NEGATIVE"], temp_output=temp_output)
-                print("向消极方向修正")
-            else:
-                real_label = self.robot_net.new_check_label_from_data(data=temp_input)
-                self.robot_net.buffer[temp_predict].append(temp_output) # 根据 预测的结果正向强化
-                print("根据预测结果正向强化")
+        
+            # 抚摸输入
+            self.robot_net.influence_all_buffer(interact=INTERACT["POSITIVE"], temp_output=temp_output)
+            print("向积极方向修正")
+        
+            # 踢打输入
+            self.robot_net.influence_all_buffer(interact=INTERACT["NEGATIVE"], temp_output=temp_output)
+            print("向消极方向修正")
+        
+            real_label = self.robot_net.new_check_label_from_data(data=temp_input)
+            self.robot_net.buffer[temp_predict].append(temp_output) # 根据 预测的结果正向强化
+            print("根据预测结果正向强化")
                 
 
             self.emo_queue_add_in_lock(temp_predict) # 这里暂时还是 每次产生一个情感吧
                 
             print("predict_label is: ", temp_predict, "real_label is: ", real_label)
             
-
-    def emo_queue_add_in_lock(self, data):
-        with self.emo_queue_lock:
-            self.emo_queue.append(data)
 
     def client_handle_thread(self, client_socket):
         # 处理不同客户端上报的环境数据， 修改self 的全局变量
@@ -580,17 +561,7 @@ class Gouzi:
             client_socket.close()
 
 
-    def start_server(self, host='192.168.1.103', port=12345):
-        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_socket.bind((host, port))
-        server_socket.listen(5) # 等待数， 连接数
-        print(f"Server listening on {host}:{port}...")
 
-        while True:
-            client_socket, addr = server_socket.accept()
-            print(f"Connection from {addr}")
-            client_handler = threading.Thread(target=self.client_handle_thread, args=(client_socket,))
-            client_handler.start()
 
 
 
